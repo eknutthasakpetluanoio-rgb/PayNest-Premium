@@ -3014,3 +3014,12 @@ document.addEventListener(
 
   }
 );
+document.addEventListener("click", e => {
+  const btn = e.target.closest('[data-action="edit"]');
+
+  if (!btn) return;
+
+  if (currentId) {
+    openModal(currentId);
+  }
+});
