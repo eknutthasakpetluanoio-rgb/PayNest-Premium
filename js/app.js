@@ -1,476 +1,422 @@
-const KEY="paynest_contracts_v1";
-const CUSTOMER_KEY="paynest_customers_v1";
+const KEY = "paynest_contracts_v1";
+const CUSTOMER_KEY = "paynest_customers_v1";
 
-let contracts=load();
-let customers=loadCustomers();
+let contracts = load();
+let customers = loadCustomers();
 
-let currentPage="home";
-let currentId=null;
-let currentCustomerName=null;
-let currentDetailType="contract";
-let listFilter="all";
-let calendarDate=new Date();
+let currentPage = "home";
+let currentId = null;
+let currentCustomerName = null;
+let currentDetailType = "contract";
+let listFilter = "all";
+let calendarDate = new Date();
 
-const $=s=>document.querySelector(s);
-const $$=s=>[...document.querySelectorAll(s)];
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 
-const money=n=>new Intl.NumberFormat("th-TH",{
-  style:"currency",
-  currency:"THB",
-  maximumFractionDigits:0
-}).format(Number(n)||0);
+const money = n => new Intl.NumberFormat("th-TH", {
+  style: "currency",
+  currency: "THB",
+  maximumFractionDigits: 0
+}).format(Number(n) || 0);
 
-const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({
-  "&":"&amp;",
-  "<":"&lt;",
-  ">":"&gt;",
-  '"':"&quot;",
-  "'":"&#039;"
+const esc = s => String(s ?? "").replace(/[&<>"']/g, m => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#039;"
 }[m]));
 
-const localDate=d=>{
-  const x=new Date(d);
-  x.setMinutes(x.getMinutes()-x.getTimezoneOffset());
-  return x.toISOString().slice(0,10);
-};
+function localDate(d) {
+  const x = new Date(d);
+  x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+  return x.toISOString().slice(0, 10);
+}
 
-const todayISO=()=>localDate(new Date());
+const todayISO = () => localDate(new Date());
 
-const parseDate=s=>s
-  ?new Date(`${s}T00:00:00`)
-  :null;
-
+function parseDate(s) {
+  return s ? new Date(`${s}T00:00:00`) : null;
+}
 
 /* =========================================================
    STORAGE
 ========================================================= */
 
-function load(){
-  try{
-    const x=JSON.parse(
-      localStorage.getItem(KEY)||"[]"
-    );
-
-    return Array.isArray(x)?x:[];
-  }catch{
-    return[];
+function load() {
+  try {
+    const x = JSON.parse(localStorage.getItem(KEY) || "[]");
+    return Array.isArray(x) ? x : [];
+  } catch {
+    return [];
   }
 }
 
-function save(){
-  localStorage.setItem(
-    KEY,
-    JSON.stringify(contracts)
-  );
+function save() {
+  localStorage.setItem(KEY, JSON.stringify(contracts));
 }
 
-function loadCustomers(){
-  try{
-    const x=JSON.parse(
-      localStorage.getItem(CUSTOMER_KEY)||"[]"
-    );
-
-    return Array.isArray(x)?x:[];
-  }catch{
-    return[];
+function loadCustomers() {
+  try {
+    const x = JSON.parse(localStorage.getItem(CUSTOMER_KEY) || "[]");
+    return Array.isArray(x) ? x : [];
+  } catch {
+    return [];
   }
 }
 
-function saveCustomers(){
-  localStorage.setItem(
-    CUSTOMER_KEY,
-    JSON.stringify(customers)
-  );
+function saveCustomers() {
+  localStorage.setItem(CUSTOMER_KEY, JSON.stringify(customers));
 }
 
-function uid(){
-  return crypto.randomUUID?.()||
-    Date.now().toString(36)+
-    Math.random().toString(36).slice(2);
+function uid() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
-
 
 /* =========================================================
    CUSTOMER
 ========================================================= */
 
-function syncCustomer(c){
+function syncCustomer(c) {
+  if (!c?.customer) return;
 
-  if(!c?.customer)return;
+  const name = c.customer.trim();
+  if (!name) return;
 
-  const name=c.customer.trim();
-  const key=name.toLowerCase();
+  const key = name.toLowerCase();
 
-  let x=customers.find(v=>
-    String(v.name||"").toLowerCase()===key
+  let x = customers.find(v =>
+    String(v.name || "").toLowerCase() === key
   );
 
-  if(x){
-
-    if(c.phone&&!x.phone){
-      x.phone=c.phone;
-    }
-
-    x.updatedAt=new Date().toISOString();
-
-  }else{
-
+  if (x) {
+    if (c.phone && !x.phone) x.phone = c.phone;
+    x.updatedAt = new Date().toISOString();
+  } else {
     customers.push({
-      id:uid(),
+      id: uid(),
       name,
-      phone:c.phone||"",
-      notes:"",
-      createdAt:new Date().toISOString(),
-      updatedAt:new Date().toISOString()
+      phone: c.phone || "",
+      notes: "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
-
   }
 
   saveCustomers();
 }
 
-
 /* =========================================================
    DATE
 ========================================================= */
 
-function addPeriod(s,f){
+function addPeriod(s, f) {
+  const d = parseDate(s) || new Date();
+  const day = d.getDate();
 
-  const d=parseDate(s)||new Date();
-  const day=d.getDate();
-
-  if(f==="daily"){
-    d.setDate(d.getDate()+1);
-  }
-
-  else if(f==="weekly"){
-    d.setDate(d.getDate()+7);
-  }
-
-  else{
-
-    const m=d.getMonth()+1;
-
+  if (f === "daily") {
+    d.setDate(d.getDate() + 1);
+  } else if (f === "weekly") {
+    d.setDate(d.getDate() + 7);
+  } else {
+    const targetMonth = d.getMonth() + 1;
     d.setDate(1);
-    d.setMonth(m);
+    d.setMonth(targetMonth);
 
-    d.setDate(
-      Math.min(
-        day,
-        new Date(
-          d.getFullYear(),
-          d.getMonth()+1,
-          0
-        ).getDate()
-      )
-    );
-
+    d.setDate(Math.min(
+      day,
+      new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    ));
   }
 
   return localDate(d);
 }
 
-function nextDueAfterPayment(c){
+function nextDueAfterPayment(c) {
   return addPeriod(
-    c.dueDate||
-    c.startDate||
-    todayISO(),
+    c.dueDate || c.startDate || todayISO(),
     c.frequency
   );
 }
-
 
 /* =========================================================
    STATUS / CALC
 ========================================================= */
 
-function status(c){
-
-  if(
-    Number(c.paid||0)>=
-    Number(c.term||0)
-  ){
-    return"completed";
+function status(c) {
+  if (Number(c.paid || 0) >= Number(c.term || 0)) {
+    return "completed";
   }
 
-  if(
-    c.dueDate&&
-    c.dueDate<todayISO()
-  ){
-    return"overdue";
+  if (c.dueDate && c.dueDate < todayISO()) {
+    return "overdue";
   }
 
-  const left=
-    Number(c.term||0)-
-    Number(c.paid||0);
+  const left =
+    Number(c.term || 0) -
+    Number(c.paid || 0);
 
-  if(
-    left<=2||
+  if (
+    left <= 2 ||
     (
-      Number(c.term||0)>0&&
-      Number(c.paid||0)/
-      Number(c.term||0)>=.8
+      Number(c.term || 0) > 0 &&
+      Number(c.paid || 0) /
+      Number(c.term || 0) >= 0.8
     )
-  ){
-    return"near";
+  ) {
+    return "near";
   }
 
-  return"normal";
+  return "normal";
 }
 
-function balance(c){
-
+function balance(c) {
   return Math.max(
     0,
-    (Number(c.installment)||0)*
+    Number(c.installment || 0) *
     Math.max(
       0,
-      (Number(c.term)||0)-
-      (Number(c.paid)||0)
+      Number(c.term || 0) -
+      Number(c.paid || 0)
     )
   );
 }
 
-function totalContractValue(c){
-
-  return Number(c.installment||0)*
-    Number(c.term||0);
+function totalContractValue(c) {
+  return Number(c.installment || 0) *
+    Number(c.term || 0);
 }
 
-function fmtDate(s){
+function fmtDate(s) {
+  if (!s) return "ไม่ระบุ";
 
-  if(!s)return"ไม่ระบุ";
-
-  const d=parseDate(s);
+  const d = parseDate(s);
 
   return d
-    ?d.toLocaleDateString(
-      "th-TH",
-      {
-        day:"numeric",
-        month:"short",
-        year:"numeric"
-      }
-    )
-    :"ไม่ระบุ";
+    ? d.toLocaleDateString(
+        "th-TH",
+        {
+          day: "numeric",
+          month: "short",
+          year: "numeric"
+        }
+      )
+    : "ไม่ระบุ";
 }
 
-function frequencyText(v){
-
-  return({
-    daily:"รายวัน",
-    weekly:"รายสัปดาห์",
-    monthly:"รายเดือน"
-  }[v]||v);
+function frequencyText(v) {
+  return ({
+    daily: "รายวัน",
+    weekly: "รายสัปดาห์",
+    monthly: "รายเดือน"
+  }[v] || v || "ไม่ระบุ");
 }
 
-function statusText(v){
-
-  return({
-    normal:"ปกติ",
-    near:"ใกล้ครบ",
-    overdue:"ค้างชำระ",
-    completed:"ครบแล้ว"
-  }[v]||v);
+function statusText(v) {
+  return ({
+    normal: "ปกติ",
+    near: "ใกล้ครบ",
+    overdue: "ค้างชำระ",
+    completed: "ครบแล้ว"
+  }[v] || v || "");
 }
-
 
 /* =========================================================
    NAVIGATION
 ========================================================= */
 
-function go(page){
+function go(page) {
+  currentPage = page;
 
-  currentPage=page;
-
-  $$(".page").forEach(p=>
+  $$(".page").forEach(p => {
     p.classList.toggle(
       "active",
-      p.id===`page-${page}`
-    )
-  );
+      p.id === `page-${page}`
+    );
+  });
 
-  $$(".nav").forEach(n=>
+  $$(".nav").forEach(n => {
     n.classList.toggle(
       "active",
-      n.dataset.page===page
-    )
-  );
+      n.dataset.page === page
+    );
+  });
 
-  if($("#fab")){
-    $("#fab").style.display=
-      page==="detail"
-        ?"none"
-        :"grid";
+  if ($("#fab")) {
+    $("#fab").style.display =
+      page === "detail"
+        ? "none"
+        : "grid";
   }
 
-  if(page==="home")renderHome();
-  if(page==="contracts")renderContracts();
-  if(page==="calendar")renderCalendar();
-  if(page==="customers")renderCustomers();
-  if(page==="settings")renderSettings();
+  if (page === "home") renderHome();
+  if (page === "contracts") renderContracts();
+  if (page === "calendar") renderCalendar();
+  if (page === "customers") renderCustomers();
+  if (page === "settings") renderSettings();
 
   window.scrollTo({
-    top:0,
-    behavior:"smooth"
+    top: 0,
+    behavior: "smooth"
   });
 }
-
 
 /* =========================================================
    HOME
 ========================================================= */
 
-function renderHome(){
-
-  const active=
+function renderHome() {
+  const active =
     contracts.filter(
-      c=>status(c)!=="completed"
+      c => status(c) !== "completed"
     );
 
-  const monthly=
+  const monthly =
     active
-      .filter(c=>c.frequency==="monthly")
+      .filter(
+        c => c.frequency === "monthly"
+      )
       .reduce(
-        (s,c)=>
-          s+Number(c.installment||0),
+        (s, c) =>
+          s + Number(c.installment || 0),
         0
       );
 
-  const remain=
+  const remain =
     contracts.reduce(
-      (s,c)=>s+balance(c),
+      (s, c) => s + balance(c),
       0
     );
 
-  const paid=
+  const paid =
     contracts.reduce(
-      (s,c)=>
-        s+
-        Number(c.installment||0)*
-        Number(c.paid||0),
+      (s, c) =>
+        s +
+        Number(c.installment || 0) *
+        Number(c.paid || 0),
       0
     );
 
-  const total=
+  const total =
     contracts.reduce(
-      (s,c)=>
-        s+totalContractValue(c),
+      (s, c) =>
+        s + totalContractValue(c),
       0
     );
 
-  const progress=
+  const progress =
     total
-      ?Math.min(
-        100,
-        Math.round(
-          paid/total*100
+      ? Math.min(
+          100,
+          Math.round(
+            paid / total * 100
+          )
         )
-      )
-      :0;
+      : 0;
 
-  if($("#monthlyTotal"))
-    $("#monthlyTotal").textContent=money(monthly);
+  if ($("#monthlyTotal"))
+    $("#monthlyTotal").textContent =
+      money(monthly);
 
-  if($("#totalContractsText"))
-    $("#totalContractsText").textContent=
+  if ($("#totalContractsText"))
+    $("#totalContractsText").textContent =
       `${contracts.length} สัญญา`;
 
-  if($("#remainingTotal"))
-    $("#remainingTotal").textContent=
+  if ($("#remainingTotal"))
+    $("#remainingTotal").textContent =
       money(remain);
 
-  if($("#paidTotal"))
-    $("#paidTotal").textContent=
+  if ($("#paidTotal"))
+    $("#paidTotal").textContent =
       money(paid);
 
-  if($("#overallProgressText"))
-    $("#overallProgressText").textContent=
+  if ($("#overallProgressText"))
+    $("#overallProgressText").textContent =
       `${progress}%`;
 
-  if($("#overallProgress"))
-    $("#overallProgress").style.width=
+  if ($("#overallProgress"))
+    $("#overallProgress").style.width =
       `${progress}%`;
 
-  if($("#normalCount"))
-    $("#normalCount").textContent=
+  if ($("#normalCount"))
+    $("#normalCount").textContent =
       contracts.filter(
-        c=>status(c)==="normal"
+        c => status(c) === "normal"
       ).length;
 
-  if($("#nearCount"))
-    $("#nearCount").textContent=
+  if ($("#nearCount"))
+    $("#nearCount").textContent =
       contracts.filter(
-        c=>status(c)==="near"
+        c => status(c) === "near"
       ).length;
 
-  if($("#overdueCount"))
-    $("#overdueCount").textContent=
+  if ($("#overdueCount"))
+    $("#overdueCount").textContent =
       contracts.filter(
-        c=>status(c)==="overdue"
+        c => status(c) === "overdue"
       ).length;
 
-  const overdue=
+  const overdue =
     contracts.filter(
-      c=>status(c)==="overdue"
+      c => status(c) === "overdue"
     ).length;
 
-  if($("#insight")){
-
-    $("#insight").textContent=
-      contracts.length===0
-        ?"ยังไม่มีสัญญา เริ่มต้นด้วยการเพิ่มสัญญาแรกของคุณ"
-        :overdue
-          ?`มี ${overdue} สัญญาที่เลยกำหนด ควรตรวจสอบและติดตามการชำระ`
-          :`มี ${active.length} สัญญาที่ยังดำเนินอยู่ ความคืบหน้ารวม ${progress}%`;
+  if ($("#insight")) {
+    $("#insight").textContent =
+      contracts.length === 0
+        ? "ยังไม่มีสัญญา เริ่มต้นด้วยการเพิ่มสัญญาแรกของคุณ"
+        : overdue
+          ? `มี ${overdue} สัญญาที่เลยกำหนด ควรตรวจสอบและติดตามการชำระ`
+          : `มี ${active.length} สัญญาที่ยังดำเนินอยู่ ความคืบหน้ารวม ${progress}%`;
   }
 
-  const recent=
+  const recent =
     [...contracts]
       .sort(
-        (a,b)=>
-          (b.createdAt||"")
-          .localeCompare(
-            a.createdAt||""
-          )
+        (a, b) =>
+          (b.createdAt || "")
+            .localeCompare(
+              a.createdAt || ""
+            )
       )
-      .slice(0,4);
+      .slice(0, 4);
 
-  if($("#recentList")){
-
-    $("#recentList").innerHTML=
+  if ($("#recentList")) {
+    $("#recentList").innerHTML =
       recent.length
-        ?recent.map(cardHTML).join("")
-        :emptyHTML(
-          "ยังไม่มีสัญญา",
-          "กด + เพื่อเพิ่มสัญญา"
-        );
+        ? recent.map(cardHTML).join("")
+        : emptyHTML(
+            "ยังไม่มีสัญญา",
+            "กด + เพื่อเพิ่มสัญญา"
+          );
   }
 }
-
 
 /* =========================================================
    CONTRACT CARD
 ========================================================= */
 
-function cardHTML(c){
+function cardHTML(c) {
+  const st = status(c);
 
-  const st=status(c);
+  const pct =
+    c.term
+      ? Math.min(
+          100,
+          Math.round(
+            Number(c.paid || 0) /
+            Number(c.term || 0) *
+            100
+          )
+        )
+      : 0;
 
-  const pct=c.term
-    ?Math.min(
-      100,
-      Math.round(
-        Number(c.paid||0)/
-        Number(c.term||0)*100
-      )
-    )
-    :0;
-
-  return`
+  return `
     <button
       class="contract-card"
-      data-open="${c.id}"
+      data-open="${esc(c.id)}"
       type="button"
     >
 
@@ -485,9 +431,8 @@ function cardHTML(c){
           <p>
             ${esc(c.customer)}
             ${c.phone
-              ?" • "+esc(c.phone)
-              :""
-            }
+              ? " • " + esc(c.phone)
+              : ""}
           </p>
 
         </div>
@@ -504,9 +449,9 @@ function cardHTML(c){
       >
 
         <div class="progress">
-
-          <i style="width:${pct}%"></i>
-
+          <i
+            style="width:${pct}%"
+          ></i>
         </div>
 
       </div>
@@ -519,18 +464,19 @@ function cardHTML(c){
         <p>
           ${frequencyText(c.frequency)}
           •
-          ${c.paid}/${c.term} งวด
+          ${Number(c.paid || 0)}/${Number(c.term || 0)}
+          งวด
         </p>
 
         <span
           class="status-badge ${
-            st==="overdue"
-              ?"danger"
-              :st==="near"
-                ?"warning"
-                :st==="completed"
-                  ?"success"
-                  :""
+            st === "overdue"
+              ? "danger"
+              : st === "near"
+                ? "warning"
+                : st === "completed"
+                  ? "success"
+                  : ""
           }"
         >
           ${statusText(st)}
@@ -542,128 +488,128 @@ function cardHTML(c){
   `;
 }
 
-function emptyHTML(a,b){
-
-  return`
+function emptyHTML(a, b) {
+  return `
     <div class="empty">
-      <b>${a}</b>
-      <span>${b}</span>
+      <b>${esc(a)}</b>
+      <span>${esc(b)}</span>
     </div>
   `;
 }
-
 
 /* =========================================================
    CONTRACT LIST
 ========================================================= */
 
-function renderContracts(){
-
-  const q=
-    ($("#searchInput")?.value||"")
+function renderContracts() {
+  const q =
+    ($("#searchInput")?.value || "")
       .trim()
       .toLowerCase();
 
-  const sort=
-    $("#sortSelect")?.value||
+  const sort =
+    $("#sortSelect")?.value ||
     "due";
 
-  let arr=
-    contracts.filter(c=>
+  let arr =
+    contracts.filter(c =>
       (
-        !q||
-        `${c.customer} ${c.product} ${c.phone||""}`
+        !q ||
+        `${c.customer} ${c.product} ${c.phone || ""}`
           .toLowerCase()
           .includes(q)
-      )&&
+      ) &&
       (
-        listFilter==="all"||
-        status(c)===listFilter
+        listFilter === "all" ||
+        status(c) === listFilter
       )
     );
 
-  arr.sort((a,b)=>{
+  arr.sort((a, b) => {
 
-    if(sort==="newest")
-      return(
-        b.createdAt||""
+    if (sort === "newest") {
+      return (
+        b.createdAt || ""
       ).localeCompare(
-        a.createdAt||""
+        a.createdAt || ""
       );
+    }
 
-    if(sort==="balance")
-      return balance(b)-balance(a);
+    if (sort === "balance") {
+      return balance(b) - balance(a);
+    }
 
-    if(sort==="name")
-      return String(a.customer||"")
-        .localeCompare(
-          String(b.customer||""),
-          "th"
-        );
+    if (sort === "name") {
+      return String(
+        a.customer || ""
+      ).localeCompare(
+        String(b.customer || ""),
+        "th"
+      );
+    }
 
-    return(
-      a.dueDate||"9999"
+    return (
+      a.dueDate || "9999"
     ).localeCompare(
-      b.dueDate||"9999"
+      b.dueDate || "9999"
     );
   });
 
-  if($("#contractCountLabel"))
-    $("#contractCountLabel").textContent=
+  if ($("#contractCountLabel")) {
+    $("#contractCountLabel").textContent =
       `${arr.length} / ${contracts.length} สัญญา`;
+  }
 
-  if($("#contractList"))
-    $("#contractList").innerHTML=
+  if ($("#contractList")) {
+    $("#contractList").innerHTML =
       arr.length
-        ?arr.map(cardHTML).join("")
-        :emptyHTML(
-          "ไม่พบสัญญา",
-          "ลองเปลี่ยนคำค้นหาหรือตัวกรอง"
-        );
+        ? arr.map(cardHTML).join("")
+        : emptyHTML(
+            "ไม่พบสัญญา",
+            "ลองเปลี่ยนคำค้นหาหรือตัวกรอง"
+          );
+  }
 
-  $$(".chip").forEach(x=>
+  $$(".chip").forEach(x => {
     x.classList.toggle(
       "active",
-      x.dataset.listFilter===listFilter
-    )
-  );
+      x.dataset.listFilter === listFilter
+    );
+  });
 }
-
-
 /* =========================================================
    CONTRACT DETAIL
 ========================================================= */
 
-function openDetail(id){
+function openDetail(id) {
+  currentId = id;
+  currentDetailType = "contract";
 
-  currentId=id;
-  currentDetailType="contract";
+  const c = contracts.find(
+    x => x.id === id
+  );
 
-  const c=
-    contracts.find(
-      x=>x.id===id
-    );
+  if (!c || !$("#detailContent")) return;
 
-  if(!c)return;
+  const st = status(c);
 
-  const st=status(c);
-
-  const pct=c.term
-    ?Math.min(
-      100,
-      Math.round(
-        Number(c.paid||0)/
-        Number(c.term||0)*100
+  const pct = c.term
+    ? Math.min(
+        100,
+        Math.round(
+          Number(c.paid || 0) /
+          Number(c.term || 0) *
+          100
+        )
       )
-    )
-    :0;
+    : 0;
 
-  $("#detailContent").innerHTML=`
+  $("#detailContent").innerHTML = `
 
     <section class="detail-card glass">
 
       <span class="eyebrow">
-        ${statusText(st).toUpperCase()}
+        ${esc(statusText(st).toUpperCase())}
       </span>
 
       <h2>
@@ -673,9 +619,8 @@ function openDetail(id){
       <p>
         ${esc(c.customer)}
         ${c.phone
-          ?" • "+esc(c.phone)
-          :""
-        }
+          ? " • " + esc(c.phone)
+          : ""}
       </p>
 
       <div class="detail-amount">
@@ -693,7 +638,8 @@ function openDetail(id){
 
           <span>
             ชำระแล้ว
-            ${c.paid}/${c.term} งวด
+            ${Number(c.paid || 0)}/${Number(c.term || 0)}
+            งวด
           </span>
 
           <b>${pct}%</b>
@@ -702,13 +648,16 @@ function openDetail(id){
 
         <div class="progress">
 
-          <i style="width:${pct}%"></i>
+          <i
+            style="width:${pct}%"
+          ></i>
 
         </div>
 
       </div>
 
     </section>
+
 
     <section class="detail-card glass">
 
@@ -739,17 +688,32 @@ function openDetail(id){
           <b>${fmtDate(c.startDate)}</b>
         </div>
 
-        <div><span>งวดถัดไป</span><b>${st === "completed" ? "ครบสัญญา" : fmtDate(c.dueDate)}</b></div>
+        <div>
+
+          <span>งวดถัดไป</span>
+
+          <b>
+            ${
+              st === "completed"
+                ? "ครบสัญญา"
+                : fmtDate(c.dueDate)
+            }
+          </b>
+
+        </div>
 
       </div>
 
     </section>
 
+
     <section class="detail-card glass">
 
       <div class="section-head">
 
-        <h2>การชำระ</h2>
+        <h2>
+          การชำระ
+        </h2>
 
       </div>
 
@@ -758,30 +722,40 @@ function openDetail(id){
         <button
           class="btn secondary"
           data-action="delete"
-          data-id="${c.id}"
+          data-id="${esc(c.id)}"
           type="button"
         >
           ลบสัญญา
         </button>
 
+
         <button
-  class="btn primary"
-  data-action="pay"
-  data-id="${c.id}"
-  ${st==="completed"?"disabled":""}
->
-  ${st==="completed" ? "ชำระครบแล้ว" : "บันทึกชำระ 1 งวด"}
-</button>
+          class="btn primary"
+          data-action="pay"
+          data-id="${esc(c.id)}"
+          ${st === "completed" ? "disabled" : ""}
+          type="button"
+        >
+          ${
+            st === "completed"
+              ? "ชำระครบแล้ว"
+              : "บันทึกชำระ 1 งวด"
+          }
+        </button>
 
       </div>
 
+
       ${
         c.notes
-          ?`<p style="margin-top:15px">${esc(c.notes)}</p>`
-          :""
+          ? `<p style="margin-top:15px">
+              ${esc(c.notes)}
+            </p>`
+          : ""
       }
 
     </section>
+
 
     ${paymentHistoryHTML(c)}
 
@@ -795,44 +769,48 @@ function openDetail(id){
    CUSTOMER DETAIL
 ========================================================= */
 
-function openCustomerDetail(name){
+function openCustomerDetail(name) {
 
-  const customer=
-    customers.find(c=>
-      String(c.name||"")
-        .toLowerCase()===
-      String(name||"")
+  const customer =
+    customers.find(c =>
+      String(c.name || "")
+        .toLowerCase() ===
+      String(name || "")
         .toLowerCase()
     );
 
-  if(!customer)return;
+  if (!customer) return;
 
-  currentCustomerName=customer.name;
-  currentDetailType="customer";
-  currentId=null;
+  currentCustomerName =
+    customer.name;
 
-  const related=
+  currentDetailType =
+    "customer";
+
+  currentId = null;
+
+  const related =
     contracts
-      .filter(c=>
-        String(c.customer||"")
-          .toLowerCase()===
+      .filter(c =>
+        String(c.customer || "")
+          .toLowerCase() ===
         customer.name.toLowerCase()
       )
-      .sort(
-        (a,b)=>
-          (a.dueDate||"9999")
+      .sort((a, b) =>
+        (a.dueDate || "9999")
           .localeCompare(
-            b.dueDate||"9999"
+            b.dueDate || "9999"
           )
       );
 
-  const total=
+  const total =
     related.reduce(
-      (s,c)=>s+balance(c),
+      (s, c) =>
+        s + balance(c),
       0
     );
 
-  $("#detailContent").innerHTML=`
+  $("#detailContent").innerHTML = `
 
     <section class="detail-card glass">
 
@@ -846,17 +824,22 @@ function openCustomerDetail(name){
 
       ${
         customer.phone
-          ?`<p>${esc(customer.phone)}</p>`
-          :""
+          ? `<p>
+              ${esc(customer.phone)}
+            </p>`
+          : ""
       }
 
       <div class="detail-amount">
         ${money(total)}
       </div>
 
-      <p>ยอดคงเหลือทั้งหมด</p>
+      <p>
+        ยอดคงเหลือทั้งหมด
+      </p>
 
     </section>
+
 
     <section class="detail-card glass">
 
@@ -880,17 +863,19 @@ function openCustomerDetail(name){
 
       </div>
 
+
       ${
         related.length
-          ?`
+
+          ? `
             <div class="list">
 
               ${
-                related.map(c=>`
+                related.map(c => `
 
                   <button
                     class="agenda-item"
-                    data-open="${c.id}"
+                    data-open="${esc(c.id)}"
                     type="button"
                   >
 
@@ -903,12 +888,16 @@ function openCustomerDetail(name){
                       <small>
                         ${frequencyText(c.frequency)}
                         •
-                        ${c.paid}/${c.term} งวด
+                        ${Number(c.paid || 0)}/${Number(c.term || 0)}
+                        งวด
                       </small>
 
                       <small>
-                        งวดถัดไป
-                        ${fmtDate(c.dueDate)}
+                        ${
+                          status(c) === "completed"
+                            ? "ครบสัญญา"
+                            : `งวดถัดไป ${fmtDate(c.dueDate)}`
+                        }
                       </small>
 
                     </div>
@@ -924,10 +913,11 @@ function openCustomerDetail(name){
 
             </div>
           `
-          :emptyHTML(
-            "ยังไม่มีสัญญา",
-            "ลูกค้ารายนี้ยังไม่มีสัญญา"
-          )
+
+          : emptyHTML(
+              "ยังไม่มีสัญญา",
+              "ลูกค้ารายนี้ยังไม่มีสัญญา"
+            )
       }
 
     </section>
@@ -942,27 +932,43 @@ function openCustomerDetail(name){
    CONTRACT MODAL
 ========================================================= */
 
-function openModal(id=null){
+function openModal(id = null) {
 
-  $("#contractForm").reset();
+  const form =
+    $("#contractForm");
 
-  $("#editId").value="";
+  if (
+    !form ||
+    !$("#modal")
+  ) {
+    return;
+  }
 
-  $("#modalTitle").textContent=
+  form.reset();
+
+  if ($("#editId")) {
+    $("#editId").value = "";
+  }
+
+  $("#modalTitle").textContent =
     id
-      ?"แก้ไขสัญญา"
-      :"เพิ่มสัญญา";
+      ? "แก้ไขสัญญา"
+      : "เพิ่มสัญญา";
 
-  if(id){
 
-    const c=
+  if (id) {
+
+    const c =
       contracts.find(
-        x=>x.id===id
+        x => x.id === id
       );
 
-    if(!c)return;
+    if (!c) return;
 
-    $("#editId").value=c.id;
+    if ($("#editId")) {
+      $("#editId").value =
+        c.id;
+    }
 
     [
       "customer",
@@ -976,65 +982,109 @@ function openModal(id=null){
       "startDate",
       "dueDate",
       "notes"
-    ].forEach(k=>{
+    ].forEach(k => {
 
-      if($("#"+k))
-        $("#"+k).value=
-          c[k]??"";
+      if ($(`#${k}`)) {
+
+        $(`#${k}`).value =
+          c[k] ?? "";
+
+      }
 
     });
 
-  }else{
+  } else {
 
-    $("#down").value=0;
-    $("#frequency").value="monthly";
-    $("#startDate").value=todayISO();
-    $("#dueDate").value=todayISO();
+    if ($("#down"))
+      $("#down").value = 0;
+
+    if ($("#frequency"))
+      $("#frequency").value =
+        "monthly";
+
+    if ($("#startDate"))
+      $("#startDate").value =
+        todayISO();
+
+    if ($("#dueDate"))
+      $("#dueDate").value =
+        todayISO();
 
   }
 
+
   updateCalc();
 
-  $("#modal").classList.remove("hidden");
+  $("#modal")
+    .classList
+    .remove("hidden");
 
   setTimeout(
-    ()=>$("#customer").focus(),
+    () => $("#customer")?.focus(),
     50
   );
 }
 
-function closeModal(){
 
-  if($("#modal"))
-    $("#modal").classList.add(
-      "hidden"
-    );
+function closeModal() {
+
+  if ($("#modal")) {
+
+    $("#modal")
+      .classList
+      .add("hidden");
+
+  }
 }
 
-function updateCalc(){
 
-  const price=
-    Number($("#price").value)||0;
+function updateCalc() {
 
-  const down=
-    Number($("#down").value)||0;
+  const price =
+    Number(
+      $("#price")?.value
+    ) || 0;
 
-  const inst=
-    Number($("#installment").value)||0;
+  const down =
+    Number(
+      $("#down")?.value
+    ) || 0;
 
-  const term=
-    Number($("#term").value)||0;
+  const inst =
+    Number(
+      $("#installment")?.value
+    ) || 0;
 
-  $("#financeAmount").textContent=
-    money(
-      Math.max(
-        0,
-        price-down
-      )
-    );
+  const term =
+    Number(
+      $("#term")?.value
+    ) || 0;
 
-  $("#financeTotal").textContent=
-    money(inst*term);
+
+  if ($("#financeAmount")) {
+
+    $("#financeAmount")
+      .textContent =
+      money(
+        Math.max(
+          0,
+          price - down
+        )
+      );
+
+  }
+
+
+  if ($("#financeTotal")) {
+
+    $("#financeTotal")
+      .textContent =
+      money(
+        inst * term
+      );
+
+  }
+
 }
 
 
@@ -1042,109 +1092,150 @@ function updateCalc(){
    SAVE CONTRACT
 ========================================================= */
 
-function formSubmit(e){
+function formSubmit(e) {
 
   e.preventDefault();
 
-  const id=
-    $("#editId").value;
+  const id =
+    $("#editId")?.value;
 
-  const data={
+
+  const data = {
 
     customer:
-      $("#customer").value.trim(),
+      $("#customer")?.value.trim() ||
+      "",
 
     phone:
-      $("#phone").value.trim(),
+      $("#phone")?.value.trim() ||
+      "",
 
     product:
-      $("#product").value.trim(),
+      $("#product")?.value.trim() ||
+      "",
 
     price:
-      Number($("#price").value)||0,
+      Number(
+        $("#price")?.value
+      ) || 0,
 
     down:
-      Number($("#down").value)||0,
+      Number(
+        $("#down")?.value
+      ) || 0,
 
     frequency:
-      $("#frequency").value,
+      $("#frequency")?.value ||
+      "monthly",
 
     installment:
-      Number($("#installment").value)||0,
+      Number(
+        $("#installment")?.value
+      ) || 0,
 
     term:
-      Number($("#term").value)||0,
+      Number(
+        $("#term")?.value
+      ) || 0,
 
     startDate:
-      $("#startDate").value||
+      $("#startDate")?.value ||
       todayISO(),
 
     dueDate:
-      $("#dueDate").value||
+      $("#dueDate")?.value ||
       todayISO(),
 
     notes:
-      $("#notes").value.trim()
+      $("#notes")?.value.trim() ||
+      ""
 
   };
 
-  if(
-    !data.customer||
-    !data.product||
-    data.installment<=0||
-    data.term<=0
-  ){
+
+  if (
+    !data.customer ||
+    !data.product ||
+    data.installment <= 0 ||
+    data.term <= 0
+  ) {
+
     return toast(
       "กรุณากรอกข้อมูลให้ครบ"
     );
+
   }
 
-  if(data.down>data.price){
+
+  if (
+    data.down >
+    data.price
+  ) {
 
     return toast(
       "เงินดาวน์ต้องไม่มากกว่าราคาสินค้า"
     );
+
   }
 
-  if(id){
 
-    const i=
+  if (id) {
+
+    const i =
       contracts.findIndex(
-        c=>c.id===id
+        c => c.id === id
       );
 
-    if(i<0)
+    if (i < 0) {
+
       return toast(
         "ไม่พบสัญญา"
       );
 
-    contracts[i]={
+    }
+
+
+    contracts[i] = {
+
       ...contracts[i],
+
       ...data
+
     };
+
 
     syncCustomer(
       contracts[i]
     );
 
+
     toast(
       "แก้ไขสัญญาแล้ว"
     );
 
-  }else{
+  } else {
 
-    const c={
-      id:uid(),
+    const c = {
+
+      id: uid(),
+
       ...data,
-      paid:0,
-      paymentHistory:[],
+
+      paid: 0,
+
+      paymentHistory: [],
+
       createdAt:
-        new Date().toISOString()
+        new Date()
+          .toISOString()
+
     };
+
 
     contracts.push(c);
 
     syncCustomer(c);
+
 
     toast(
       "เพิ่มสัญญาแล้ว"
@@ -1152,57 +1243,1647 @@ function formSubmit(e){
 
   }
 
+
   save();
 
   closeModal();
 
   renderAll();
 }
-
-
 /* =========================================================
    PAYMENT
 ========================================================= */
 
-function pay(id){
+function pay(id) {
 
-  const c=
+  const c =
     contracts.find(
-      x=>x.id===id
+      x => x.id === id
     );
 
-  if(
-    !c||
-    Number(c.paid||0)>=
-    Number(c.term||0)
-  ){
+  if (
+    !c ||
+    Number(c.paid || 0) >=
+    Number(c.term || 0)
+  ) {
     return;
   }
 
-  if(
+  if (
     !Array.isArray(
       c.paymentHistory
     )
-  ){
-    c.paymentHistory=[];
+  ) {
+    c.paymentHistory = [];
   }
 
-  const installmentNumber=
-    Number(c.paid||0)+1;
 
-  const amount=
-    Number(c.installment||0);
+  const installmentNumber =
+    Number(c.paid || 0) + 1;
 
-  const paymentDate=
+  const amount =
+    Number(c.installment || 0);
+
+  const paymentDate =
     todayISO();
 
-  c.paid=
-    Number(c.paid||0)+1;
 
-  const remainingAfter=
+  c.paid =
+    Number(c.paid || 0) + 1;
+
+
+  const remainingAfter =
     Math.max(
       0,
-      amount*
+      amount *
       (
-        Number(c.term||0)-
-        Nu
+        Number(c.term || 0) -
+        Number(c.paid || 0)
+      )
+    );
+
+
+  c.paymentHistory.unshift({
+
+    id: uid(),
+
+    installment:
+      installmentNumber,
+
+    amount:
+      amount,
+
+    date:
+      paymentDate,
+
+    remaining:
+      remainingAfter
+
+  });
+
+
+  /*
+   * ถ้ายังไม่ครบ
+   * สร้างวันครบกำหนดถัดไป
+   *
+   * ถ้าครบแล้ว
+   * ไม่เลื่อนงวดต่อ
+   */
+
+  if (
+    Number(c.paid || 0) <
+    Number(c.term || 0)
+  ) {
+
+    c.dueDate =
+      nextDueAfterPayment(c);
+
+  }
+
+
+  save();
+
+  syncCustomer(c);
+
+
+  toast(
+    Number(c.paid || 0) >=
+    Number(c.term || 0)
+
+      ? "ชำระครบสัญญาแล้ว"
+
+      : `บันทึกชำระงวดที่ ${installmentNumber} แล้ว`
+  );
+
+
+  if (
+    currentPage === "detail" &&
+    currentDetailType === "contract"
+  ) {
+
+    openDetail(c.id);
+
+  } else {
+
+    renderAll();
+
+  }
+
+}
+
+
+/* =========================================================
+   PAYMENT HISTORY
+========================================================= */
+
+function paymentHistoryHTML(c) {
+
+  const history =
+    Array.isArray(c.paymentHistory)
+      ? c.paymentHistory
+      : [];
+
+
+  const ordered =
+    [...history].sort(
+      (a, b) =>
+        Number(
+          b.installment || 0
+        ) -
+        Number(
+          a.installment || 0
+        )
+    );
+
+
+  return `
+
+    <section class="detail-card glass">
+
+      <div class="section-head">
+
+        <div>
+
+          <span class="eyebrow">
+            PAYMENT HISTORY
+          </span>
+
+          <h2>
+            ประวัติการชำระ
+          </h2>
+
+        </div>
+
+
+        <span class="status-badge success">
+
+          ${ordered.length}
+          รายการ
+
+        </span>
+
+      </div>
+
+
+      ${
+        ordered.length
+
+          ? `
+
+            <div class="list">
+
+              ${
+                ordered.map(
+                  h => `
+
+                    <div
+                      class="agenda-item"
+                    >
+
+                      <div>
+
+                        <b>
+
+                          งวดที่
+                          ${Number(h.installment || 0)}
+                          /
+                          ${Number(c.term || 0)}
+
+                        </b>
+
+
+                        <small>
+
+                          ชำระวันที่
+                          ${fmtDate(h.date)}
+
+                        </small>
+
+
+                        <small>
+
+                          คงเหลือหลังชำระ
+                          ${money(h.remaining)}
+
+                        </small>
+
+                      </div>
+
+
+                      <strong>
+
+                        ${money(h.amount)}
+
+                      </strong>
+
+                    </div>
+
+                  `
+                ).join("")
+              }
+
+            </div>
+
+          `
+
+          : emptyHTML(
+
+              "ยังไม่มีประวัติการชำระ",
+
+              "เมื่อบันทึกการชำระ รายการจะปรากฏที่นี่"
+
+            )
+      }
+
+    </section>
+
+  `;
+
+}
+
+
+/* =========================================================
+   DELETE CONTRACT
+========================================================= */
+
+function deleteContract(id) {
+
+  const c =
+    contracts.find(
+      x => x.id === id
+    );
+
+  if (!c) return;
+
+
+  const ok =
+    window.confirm(
+      `ต้องการลบสัญญา "${c.product}" ของ ${c.customer} ใช่หรือไม่?`
+    );
+
+
+  if (!ok) return;
+
+
+  contracts =
+    contracts.filter(
+      x => x.id !== id
+    );
+
+
+  save();
+
+
+  toast(
+    "ลบสัญญาแล้ว"
+  );
+
+
+  currentId = null;
+
+  currentDetailType =
+    "contract";
+
+
+  go("contracts");
+
+}
+
+
+/* =========================================================
+   CUSTOMER LIST
+========================================================= */
+
+function renderCustomers() {
+
+  const q =
+    (
+      $("#customerSearch")?.value ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const arr =
+    customers
+      .filter(c =>
+        !q ||
+        `${c.name} ${c.phone || ""}`
+          .toLowerCase()
+          .includes(q)
+      )
+      .sort(
+        (a, b) =>
+          String(a.name || "")
+            .localeCompare(
+              String(b.name || ""),
+              "th"
+            )
+      );
+
+
+  if ($("#customerCount")) {
+
+    $("#customerCount")
+      .textContent =
+      `${arr.length} ราย`;
+
+  }
+
+
+  /*
+   * รองรับทั้ง id ที่อาจมีอยู่
+   * ใน index.html คนละเวอร์ชัน
+   */
+
+  const list =
+    $("#customerList") ||
+    $("#customersList");
+
+
+  if (!list) return;
+
+
+  list.innerHTML =
+    arr.length
+
+      ? arr
+          .map(
+            customerCardHTML
+          )
+          .join("")
+
+      : emptyHTML(
+          "ยังไม่มีลูกค้า",
+          "กด + เพื่อเพิ่มสัญญาและลูกค้าคนแรก"
+        );
+
+}
+
+
+function customerCardHTML(c) {
+
+  const related =
+    contracts.filter(x =>
+      String(
+        x.customer || ""
+      ).toLowerCase() ===
+      String(
+        c.name || ""
+      ).toLowerCase()
+    );
+
+
+  const total =
+    related.reduce(
+      (s, x) =>
+        s + balance(x),
+      0
+    );
+
+
+  return `
+
+    <button
+      class="customer-card agenda-item"
+      data-customer="${esc(c.name)}"
+      type="button"
+    >
+
+      <div>
+
+        <b>
+          ${esc(c.name)}
+        </b>
+
+
+        <small>
+
+          ${related.length}
+          สัญญา
+
+          ${
+            c.phone
+              ? " • " + esc(c.phone)
+              : ""
+          }
+
+        </small>
+
+      </div>
+
+
+      <strong>
+
+        ${money(total)}
+
+      </strong>
+
+    </button>
+
+  `;
+
+}
+
+
+/* =========================================================
+   CUSTOMER MODAL
+========================================================= */
+
+function ensureCustomerModal() {
+
+  if ($("#customerModal"))
+    return;
+
+
+  const el =
+    document.createElement(
+      "div"
+    );
+
+
+  el.id =
+    "customerModal";
+
+  el.className =
+    "modal hidden";
+
+
+  el.innerHTML = `
+
+    <div
+      class="modal-backdrop"
+      data-action="close-customer-modal"
+    ></div>
+
+
+    <div
+      class="modal-card"
+    >
+
+      <div class="modal-head">
+
+        <div>
+
+          <span class="eyebrow">
+            CUSTOMER
+          </span>
+
+          <h2>
+            เพิ่มลูกค้า
+          </h2>
+
+        </div>
+
+
+        <button
+          class="icon-btn"
+          data-action="close-customer-modal"
+          aria-label="ปิด"
+          type="button"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <form
+        id="customerForm"
+      >
+
+        <div class="form-grid">
+
+          <label>
+
+            ชื่อลูกค้า
+
+            <input
+              id="newCustomerName"
+              required
+              autocomplete="off"
+            >
+
+          </label>
+
+
+          <label>
+
+            เบอร์โทร
+
+            <input
+              id="newCustomerPhone"
+              type="tel"
+              autocomplete="off"
+            >
+
+          </label>
+
+        </div>
+
+
+        <label>
+
+          หมายเหตุ
+
+          <textarea
+            id="newCustomerNotes"
+            rows="3"
+          ></textarea>
+
+        </label>
+
+
+        <div
+          class="modal-actions"
+        >
+
+          <button
+            type="button"
+            class="btn secondary"
+            data-action="close-customer-modal"
+          >
+            ยกเลิก
+          </button>
+
+
+          <button
+            type="submit"
+            class="btn primary"
+          >
+            บันทึกลูกค้า
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  `;
+
+
+  document.body.appendChild(el);
+
+
+  $("#customerForm")
+    .addEventListener(
+      "submit",
+      saveNewCustomer
+    );
+
+}
+
+
+function openCustomerModal() {
+
+  ensureCustomerModal();
+
+
+  $("#newCustomerName").value =
+    "";
+
+  $("#newCustomerPhone").value =
+    "";
+
+  $("#newCustomerNotes").value =
+    "";
+
+
+  $("#customerModal")
+    .classList
+    .remove("hidden");
+
+
+  setTimeout(
+    () =>
+      $("#newCustomerName")?.focus(),
+    50
+  );
+
+}
+
+
+function closeCustomerModal() {
+
+  $("#customerModal")
+    ?.classList
+    .add("hidden");
+
+}
+
+
+function saveNewCustomer(e) {
+
+  e.preventDefault();
+
+
+  const name =
+    $("#newCustomerName")
+      ?.value.trim() ||
+    "";
+
+  const phone =
+    $("#newCustomerPhone")
+      ?.value.trim() ||
+    "";
+
+  const notes =
+    $("#newCustomerNotes")
+      ?.value.trim() ||
+    "";
+
+
+  if (!name) {
+
+    return toast(
+      "กรุณากรอกชื่อลูกค้า"
+    );
+
+  }
+
+
+  if (
+    customers.some(
+      c =>
+        String(c.name || "")
+          .toLowerCase() ===
+        name.toLowerCase()
+    )
+  ) {
+
+    return toast(
+      "มีลูกค้าชื่อนี้อยู่แล้ว"
+    );
+
+  }
+
+
+  customers.push({
+
+    id: uid(),
+
+    name,
+
+    phone,
+
+    notes,
+
+    createdAt:
+      new Date()
+        .toISOString(),
+
+    updatedAt:
+      new Date()
+        .toISOString()
+
+  });
+
+
+  saveCustomers();
+
+
+  closeCustomerModal();
+
+
+  renderCustomers();
+
+
+  toast(
+    "เพิ่มลูกค้าแล้ว"
+  );
+
+}
+
+
+/* =========================================================
+   CALENDAR
+========================================================= */
+
+function renderCalendar() {
+
+  const year =
+    calendarDate.getFullYear();
+
+  const month =
+    calendarDate.getMonth();
+
+
+  if ($("#calendarTitle")) {
+
+    $("#calendarTitle")
+      .textContent =
+      calendarDate.toLocaleDateString(
+        "th-TH",
+        {
+          month: "long",
+          year: "numeric"
+        }
+      );
+
+  }
+
+
+  const monthContracts =
+    contracts
+      .filter(
+        c => c.dueDate
+      )
+      .filter(c => {
+
+        const d =
+          parseDate(
+            c.dueDate
+          );
+
+        return (
+          d &&
+          d.getFullYear() ===
+            year &&
+          d.getMonth() ===
+            month
+        );
+
+      })
+      .sort(
+        (a, b) =>
+          (
+            a.dueDate || ""
+          ).localeCompare(
+            b.dueDate || ""
+          )
+      );
+
+
+  const list =
+    $("#calendarList") ||
+    $("#agendaList");
+
+
+  if (!list) return;
+
+
+  list.innerHTML =
+    monthContracts.length
+
+      ? monthContracts
+          .map(
+            c => `
+
+              <button
+                class="agenda-item"
+                data-open="${esc(c.id)}"
+                type="button"
+              >
+
+                <div>
+
+                  <b>
+                    ${esc(c.customer)}
+                  </b>
+
+                  <small>
+                    ${esc(c.product)}
+                  </small>
+
+                  <small>
+                    ${
+                      status(c) === "completed"
+                        ? "ครบสัญญา"
+                        : `ครบกำหนด ${fmtDate(c.dueDate)}`
+                    }
+                  </small>
+
+                </div>
+
+
+                <strong>
+                  ${money(c.installment)}
+                </strong>
+
+              </button>
+
+            `
+          )
+          .join("")
+
+      : emptyHTML(
+          "ไม่มีงวดในเดือนนี้",
+          "ยังไม่มีสัญญาที่มีกำหนดชำระในเดือนนี้"
+        );
+
+}
+
+
+function calendarPrev() {
+
+  calendarDate =
+    new Date(
+      calendarDate.getFullYear(),
+      calendarDate.getMonth() - 1,
+      1
+    );
+
+
+  renderCalendar();
+
+}
+
+
+function calendarNext() {
+
+  calendarDate =
+    new Date(
+      calendarDate.getFullYear(),
+      calendarDate.getMonth() + 1,
+      1
+    );
+
+
+  renderCalendar();
+
+}
+
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+
+function renderSettings() {
+
+  const contractStorage =
+    localStorage.getItem(KEY);
+
+  const customerStorage =
+    localStorage.getItem(
+      CUSTOMER_KEY
+    );
+
+
+  if ($("#storageContractCount")) {
+
+    $("#storageContractCount")
+      .textContent =
+      contracts.length;
+
+  }
+
+
+  if ($("#storageCustomerCount")) {
+
+    $("#storageCustomerCount")
+      .textContent =
+      customers.length;
+
+  }
+
+
+  if ($("#storageInfo")) {
+
+    $("#storageInfo")
+      .textContent =
+      `${contracts.length} สัญญา • ${customers.length} ลูกค้า • เก็บข้อมูลในเครื่อง`;
+
+  }
+
+
+  if ($("#storageStatus")) {
+
+    $("#storageStatus")
+      .textContent =
+      contractStorage !== null ||
+      customerStorage !== null
+        ? "พร้อมใช้งาน"
+        : "ยังไม่มีข้อมูล";
+
+  }
+
+}
+
+
+/* =========================================================
+   EXPORT / IMPORT
+========================================================= */
+
+function exportData() {
+
+  const data = {
+
+    app:
+      "PayNest",
+
+    version:
+      "v1",
+
+    exportedAt:
+      new Date()
+        .toISOString(),
+
+    contracts,
+
+    customers
+
+  };
+
+
+  const blob =
+    new Blob(
+      [
+        JSON.stringify(
+          data,
+          null,
+          2
+        )
+      ],
+      {
+        type:
+          "application/json"
+      }
+    );
+
+
+  const url =
+    URL.createObjectURL(
+      blob
+    );
+
+
+  const a =
+    document.createElement(
+      "a"
+    );
+
+
+  a.href =
+    url;
+
+  a.download =
+    `paynest-backup-${todayISO()}.json`;
+
+
+  document.body.appendChild(a);
+
+  a.click();
+
+  a.remove();
+
+
+  URL.revokeObjectURL(url);
+
+
+  toast(
+    "ส่งออกข้อมูลแล้ว"
+  );
+
+}
+
+
+function importData(file) {
+
+  if (!file) return;
+
+
+  const reader =
+    new FileReader();
+
+
+  reader.onload = () => {
+
+    try {
+
+      const data =
+        JSON.parse(
+          reader.result
+        );
+
+
+      if (
+        !data ||
+        !Array.isArray(
+          data.contracts
+        )
+      ) {
+
+        throw new Error(
+          "invalid"
+        );
+
+      }
+
+
+      contracts =
+        data.contracts;
+
+
+      customers =
+        Array.isArray(
+          data.customers
+        )
+          ? data.customers
+          : [];
+
+
+      save();
+
+      saveCustomers();
+
+
+      renderAll();
+
+
+      toast(
+        "นำเข้าข้อมูลแล้ว"
+      );
+
+
+    } catch {
+
+      toast(
+        "ไฟล์ข้อมูลไม่ถูกต้อง"
+      );
+
+    }
+
+  };
+
+
+  reader.readAsText(
+    file
+  );
+
+}
+
+
+/* =========================================================
+   CLEAR DATA
+========================================================= */
+
+function clearAllData() {
+
+  const ok =
+    window.confirm(
+      "ต้องการลบข้อมูลสัญญาและลูกค้าทั้งหมดใช่หรือไม่? การกระทำนี้ย้อนกลับไม่ได้"
+    );
+
+
+  if (!ok) return;
+
+
+  contracts = [];
+
+  customers = [];
+
+
+  localStorage.removeItem(
+    KEY
+  );
+
+  localStorage.removeItem(
+    CUSTOMER_KEY
+  );
+
+
+  renderAll();
+
+
+  toast(
+    "ลบข้อมูลทั้งหมดแล้ว"
+  );
+
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+function toast(message) {
+
+  let el =
+    $("#toast");
+
+
+  if (!el) {
+
+    el =
+      document.createElement(
+        "div"
+      );
+
+    el.id =
+      "toast";
+
+    el.className =
+      "toast";
+
+    document.body.appendChild(
+      el
+    );
+
+  }
+
+
+  el.textContent =
+    message;
+
+
+  el.classList.add(
+    "show"
+  );
+
+
+  clearTimeout(
+    window.__paynestToastTimer
+  );
+
+
+  window.__paynestToastTimer =
+    setTimeout(
+      () => {
+        el.classList.remove(
+          "show"
+        );
+      },
+      2200
+    );
+
+}
+/* =========================================================
+   EVENT HANDLERS
+========================================================= */
+
+function bindEvents() {
+
+  document.addEventListener(
+    "click",
+    e => {
+
+      /* ---------- Navigation ---------- */
+
+      const nav =
+        e.target.closest(
+          ".nav[data-page]"
+        );
+
+      if (nav) {
+
+        e.preventDefault();
+
+        go(
+          nav.dataset.page
+        );
+
+        return;
+
+      }
+
+
+      /* ---------- Open Contract ---------- */
+
+      const open =
+        e.target.closest(
+          "[data-open]"
+        );
+
+      if (open) {
+
+        e.preventDefault();
+
+        openDetail(
+          open.dataset.open
+        );
+
+        return;
+
+      }
+
+
+      /* ---------- Open Customer ---------- */
+
+      const customer =
+        e.target.closest(
+          "[data-customer]"
+        );
+
+      if (customer) {
+
+        e.preventDefault();
+
+        openCustomerDetail(
+          customer.dataset.customer
+        );
+
+        return;
+
+      }
+
+
+      /* ---------- Actions ---------- */
+
+      const action =
+        e.target.closest(
+          "[data-action]"
+        );
+
+      if (action) {
+
+        e.preventDefault();
+
+        const type =
+          action.dataset.action;
+
+        const id =
+          action.dataset.id;
+
+
+        if (type === "pay") {
+
+          pay(id);
+
+          return;
+
+        }
+
+
+        if (type === "delete") {
+
+          deleteContract(id);
+
+          return;
+
+        }
+
+
+        if (
+          type ===
+          "close-modal"
+        ) {
+
+          closeModal();
+
+          return;
+
+        }
+
+
+        if (
+          type ===
+          "close-customer-modal"
+        ) {
+
+          closeCustomerModal();
+
+          return;
+
+        }
+
+
+        if (type === "add") {
+
+          const activePage =
+            document.querySelector(
+              ".nav.active"
+            )?.dataset.page ||
+            currentPage;
+
+
+          if (
+            activePage ===
+            "customers"
+          ) {
+
+            openCustomerModal();
+
+          } else {
+
+            openModal();
+
+          }
+
+          return;
+
+        }
+
+
+        if (type === "back") {
+
+          go("contracts");
+
+          return;
+
+        }
+
+
+        if (
+          type ===
+          "prev-month"
+        ) {
+
+          calendarPrev();
+
+          return;
+
+        }
+
+
+        if (
+          type ===
+          "next-month"
+        ) {
+
+          calendarNext();
+
+          return;
+
+        }
+
+
+        if (type === "export") {
+
+          exportData();
+
+          return;
+
+        }
+
+
+        if (type === "import") {
+
+          $("#importInput")?.click();
+
+          return;
+
+        }
+
+
+        if (type === "clear") {
+
+          clearAllData();
+
+          return;
+
+        }
+
+      }
+
+
+      /* ---------- Filter ---------- */
+
+      const chip =
+        e.target.closest(
+          ".chip[data-list-filter]"
+        );
+
+      if (chip) {
+
+        listFilter =
+          chip.dataset.listFilter ||
+          "all";
+
+        renderContracts();
+
+        return;
+
+      }
+
+
+      /* ---------- FAB ---------- */
+
+      if (
+        e.target.closest(
+          "#fab"
+        )
+      ) {
+
+        const activePage =
+          document.querySelector(
+            ".nav.active"
+          )?.dataset.page ||
+          currentPage;
+
+
+        if (
+          activePage ===
+          "customers"
+        ) {
+
+          openCustomerModal();
+
+        } else {
+
+          openModal();
+
+        }
+
+        return;
+
+      }
+
+
+      /* ---------- Calendar ---------- */
+
+      if (
+        e.target.closest(
+          "#calendarPrev"
+        )
+      ) {
+
+        calendarPrev();
+
+        return;
+
+      }
+
+
+      if (
+        e.target.closest(
+          "#calendarNext"
+        )
+      ) {
+
+        calendarNext();
+
+        return;
+
+      }
+
+
+      /* ---------- Export ---------- */
+
+      if (
+        e.target.closest(
+          "#exportData"
+        )
+      ) {
+
+        exportData();
+
+        return;
+
+      }
+
+
+      /* ---------- Clear ---------- */
+
+      if (
+        e.target.closest(
+          "#clearData"
+        )
+      ) {
+
+        clearAllData();
+
+        return;
+
+      }
+
+    }
+  );
+
+
+  /* =======================================================
+     CONTRACT FORM
+  ======================================================= */
+
+  $("#contractForm")
+    ?.addEventListener(
+      "submit",
+      formSubmit
+    );
+
+
+  /* =======================================================
+     CALCULATOR
+  ======================================================= */
+
+  [
+    "#price",
+    "#down",
+    "#installment",
+    "#term"
+  ].forEach(
+    selector => {
+
+      $(selector)
+        ?.addEventListener(
+          "input",
+          updateCalc
+        );
+
+    }
+  );
+
+
+  /* =======================================================
+     SEARCH
+  ======================================================= */
+
+  $("#searchInput")
+    ?.addEventListener(
+      "input",
+      renderContracts
+    );
+
+
+  $("#sortSelect")
+    ?.addEventListener(
+      "change",
+      renderContracts
+    );
+
+
+  $("#customerSearch")
+    ?.addEventListener(
+      "input",
+      renderCustomers
+    );
+
+
+  /* =======================================================
+     IMPORT
+  ======================================================= */
+
+  $("#importInput")
+    ?.addEventListener(
+      "change",
+      e => {
+
+        const file =
+          e.target.files?.[0];
+
+        if (file) {
+
+          importData(file);
+
+        }
+
+        e.target.value = "";
+
+      }
+    );
+
+
+  /* =======================================================
+     MODAL BACKDROP
+  ======================================================= */
+
+  $("#modal")
+    ?.addEventListener(
+      "click",
+      e => {
+
+        if (
+          e.target ===
+          $("#modal")
+        ) {
+
+          closeModal();
+
+        }
+
+      }
+    );
+
+
+  /* =======================================================
+     KEYBOARD
+  ======================================================= */
+
+  document.addEventListener(
+    "keydown",
+    e => {
+
+      if (
+        e.key ===
+        "Escape"
+      ) {
+
+        closeModal();
+
+        closeCustomerModal();
+
+      }
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    bindEvents();
+
+    renderAll();
+
+    go("home");
+
+  }
+);
