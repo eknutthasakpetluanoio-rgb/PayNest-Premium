@@ -1,0 +1,10 @@
+{
+  "name": "PayNest",
+  "short_name": "PayNest",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "lang": "th",
+  "icons": []
+}
