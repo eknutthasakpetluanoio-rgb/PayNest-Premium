@@ -492,3 +492,290 @@ function openDetail(id){
 
   go("detail");
 }
+/* =========================================================
+   PayNest Customer Detail
+========================================================= */
+
+function ensureCustomerDetailModal(){
+  if($("#customerDetailModal"))return;
+
+  const el=document.createElement("div");
+  el.id="customerDetailModal";
+  el.className="modal hidden";
+
+  el.innerHTML=`
+    <div class="modal-backdrop" data-action="close-customer-detail"></div>
+
+    <div class="modal-card">
+
+      <div class="modal-head">
+
+        <div>
+          <span class="eyebrow">CUSTOMER PROFILE</span>
+          <h2>รายละเอียดลูกค้า</h2>
+        </div>
+
+        <button
+          class="icon-btn"
+          data-action="close-customer-detail"
+          aria-label="ปิด">
+          ×
+        </button>
+
+      </div>
+
+      <div id="customerDetailContent"></div>
+
+    </div>
+  `;
+
+  document.body.appendChild(el);
+}
+
+
+function openCustomerDetail(name){
+
+  ensureCustomerDetailModal();
+
+  const customer=customers.find(
+    c=>c.name.toLowerCase()===name.toLowerCase()
+  );
+
+  if(!customer)return;
+
+  const related=contracts
+    .filter(c=>c.customer.toLowerCase()===customer.name.toLowerCase())
+    .sort((a,b)=>
+      (b.createdAt||"").localeCompare(a.createdAt||"")
+    );
+
+  const totalBalance=related.reduce(
+    (sum,c)=>sum+balance(c),
+    0
+  );
+
+  const completed=related.filter(
+    c=>status(c)==="completed"
+  ).length;
+
+  const overdue=related.filter(
+    c=>status(c)==="overdue"
+  ).length;
+
+  $("#customerDetailContent").innerHTML=`
+
+    <section class="detail-card glass">
+
+      <span class="eyebrow">CUSTOMER</span>
+
+      <h2>${esc(customer.name)}</h2>
+
+      ${
+        customer.phone
+          ?`<p>${esc(customer.phone)}</p>`
+          :`<p>ยังไม่มีเบอร์โทร</p>`
+      }
+
+      ${
+        customer.notes
+          ?`
+            <div style="margin-top:16px">
+              <span>หมายเหตุ</span>
+              <p>${esc(customer.notes)}</p>
+            </div>
+          `
+          :""
+      }
+
+    </section>
+
+
+    <section class="detail-card glass">
+
+      <div class="detail-grid">
+
+        <div>
+          <span>สัญญาทั้งหมด</span>
+          <b>${related.length} สัญญา</b>
+        </div>
+
+        <div>
+          <span>ยอดคงเหลือ</span>
+          <b>${money(totalBalance)}</b>
+        </div>
+
+        <div>
+          <span>ชำระครบแล้ว</span>
+          <b>${completed} สัญญา</b>
+        </div>
+
+        <div>
+          <span>ค้างชำระ</span>
+          <b>${overdue} สัญญา</b>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <section class="detail-card glass">
+
+      <div class="section-head">
+
+        <div>
+          <span class="eyebrow">CONTRACTS</span>
+          <h2>สัญญาของลูกค้า</h2>
+        </div>
+
+      </div>
+
+      ${
+        related.length
+          ?`
+            <div class="list">
+
+              ${related.map(c=>{
+
+                const st=status(c);
+
+                return `
+                  <button
+                    class="contract-card"
+                    data-open="${c.id}"
+                    data-close-customer-detail="true">
+
+                    <div class="card-row">
+
+                      <div>
+
+                        <h3>${esc(c.product)}</h3>
+
+                        <p>
+                          ${frequencyText(c.frequency)}
+                          • ${c.paid}/${c.term} งวด
+                        </p>
+
+                      </div>
+
+                      <div class="balance">
+                        ${money(balance(c))}
+                      </div>
+
+                    </div>
+
+                    <div
+                      class="card-row"
+                      style="margin-top:10px">
+
+                      <p>งวดถัดไป ${fmtDate(c.dueDate)}</p>
+
+                      <span class="status-badge ${
+                        st==="overdue"
+                          ?"danger"
+                          :st==="near"
+                          ?"warning"
+                          :st==="completed"
+                          ?"success"
+                          :""
+                      }">
+                        ${statusText(st)}
+                      </span>
+
+                    </div>
+
+                  </button>
+                `;
+
+              }).join("")}
+
+            </div>
+          `
+          :emptyHTML(
+            "ยังไม่มีสัญญา",
+            "เพิ่มสัญญาให้ลูกค้ารายนี้เพื่อเริ่มต้น"
+          )
+      }
+
+    </section>
+
+  `;
+
+  $("#customerDetailModal").classList.remove("hidden");
+}
+
+
+function closeCustomerDetail(){
+
+  const modal=$("#customerDetailModal");
+
+  if(modal){
+    modal.classList.add("hidden");
+  }
+
+}
+
+
+/* ---------- Customer List Click ---------- */
+
+document.addEventListener("click",e=>{
+
+  const item=e.target.closest(".customer-item");
+
+  if(
+    item &&
+    !e.target.closest("[data-open]")
+  ){
+
+    const name=item.querySelector("b")?.textContent?.trim();
+
+    if(name){
+      openCustomerDetail(name);
+    }
+
+  }
+
+});
+
+
+/* ---------- Close Customer Detail ---------- */
+
+document.addEventListener("click",e=>{
+
+  const action=e.target.closest(
+    '[data-action="close-customer-detail"]'
+  );
+
+  if(action){
+    closeCustomerDetail();
+  }
+
+});
+
+
+/* ---------- Open Contract From Customer ---------- */
+
+document.addEventListener("click",e=>{
+
+  const contract=e.target.closest(
+    '[data-close-customer-detail="true"]'
+  );
+
+  if(contract){
+
+    closeCustomerDetail();
+
+  }
+
+});
+
+
+/* ---------- ESC ---------- */
+
+window.addEventListener("keydown",e=>{
+
+  if(e.key==="Escape"){
+    closeCustomerDetail();
+  }
+
+});
