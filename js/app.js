@@ -1963,17 +1963,13 @@ function saveNewCustomer(e) {
 
 function renderCalendar() {
 
-  const year =
-    calendarDate.getFullYear();
+  const year = calendarDate.getFullYear();
+  const month = calendarDate.getMonth();
 
-  const month =
-    calendarDate.getMonth();
-
+  /* ---------- Header ---------- */
 
   if ($("#calendarTitle")) {
-
-    $("#calendarTitle")
-      .textContent =
+    $("#calendarTitle").textContent =
       calendarDate.toLocaleDateString(
         "th-TH",
         {
@@ -1981,40 +1977,157 @@ function renderCalendar() {
           year: "numeric"
         }
       );
+  }
+
+
+  /* ---------- Contracts in this month ---------- */
+
+  const monthContracts =
+    contracts
+      .filter(c => c.dueDate)
+      .filter(c => {
+
+        const d = parseDate(c.dueDate);
+
+        return (
+          d &&
+          d.getFullYear() === year &&
+          d.getMonth() === month
+        );
+
+      })
+      .sort((a, b) =>
+        String(a.dueDate || "")
+          .localeCompare(
+            String(b.dueDate || "")
+          )
+      );
+
+
+  /* ---------- Calendar Grid ---------- */
+
+  const grid = $("#calendarGrid");
+
+  if (grid) {
+
+    const firstDay =
+      new Date(
+        year,
+        month,
+        1
+      ).getDay();
+
+    const daysInMonth =
+      new Date(
+        year,
+        month + 1,
+        0
+      ).getDate();
+
+    const prevDays =
+      new Date(
+        year,
+        month,
+        0
+      ).getDate();
+
+
+    let html = "";
+
+
+    /* Previous month days */
+
+    for (
+      let i = firstDay - 1;
+      i >= 0;
+      i--
+    ) {
+
+      html += `
+        <div class="day muted">
+          ${prevDays - i}
+        </div>
+      `;
+
+    }
+
+
+    /* Current month */
+
+    for (
+      let day = 1;
+      day <= daysInMonth;
+      day++
+    ) {
+
+      const date =
+        `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+      const dueContracts =
+        monthContracts.filter(
+          c => c.dueDate === date
+        );
+
+      const isToday =
+        date === todayISO();
+
+      const hasDue =
+        dueContracts.length > 0;
+
+      const firstContract =
+        dueContracts[0];
+
+
+      html += `
+        <button
+          type="button"
+          class="day
+            ${isToday ? "today" : ""}
+            ${hasDue ? "has-due" : ""}
+          "
+          ${
+            firstContract
+              ? `data-open="${esc(firstContract.id)}"`
+              : ""
+          }
+        >
+          ${day}
+        </button>
+      `;
+
+    }
+
+
+    /* Next month days */
+
+    const totalCells =
+      firstDay + daysInMonth;
+
+    const nextDays =
+      (7 - (totalCells % 7)) % 7;
+
+
+    for (
+      let day = 1;
+      day <= nextDays;
+      day++
+    ) {
+
+      html += `
+        <div class="day muted">
+          ${day}
+        </div>
+      `;
+
+    }
+
+
+    grid.innerHTML = html;
 
   }
 
 
-  const monthContracts =
-    contracts
-      .filter(
-        c => c.dueDate
-      )
-      .filter(c => {
-
-        const d =
-          parseDate(
-            c.dueDate
-          );
-
-        return (
-          d &&
-          d.getFullYear() ===
-            year &&
-          d.getMonth() ===
-            month
-        );
-
-      })
-      .sort(
-        (a, b) =>
-          (
-            a.dueDate || ""
-          ).localeCompare(
-            b.dueDate || ""
-          )
-      );
-
+  /* ---------- Due Date List ---------- */
 
   const list =
     $("#calendarList") ||
@@ -2056,7 +2169,6 @@ function renderCalendar() {
                   </small>
 
                 </div>
-
 
                 <strong>
                   ${money(c.installment)}
