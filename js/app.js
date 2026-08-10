@@ -739,10 +739,7 @@ function openDetail(id){
           <b>${fmtDate(c.startDate)}</b>
         </div>
 
-        <div>
-          <span>งวดถัดไป</span>
-          <b>${fmtDate(c.dueDate)}</b>
-        </div>
+        <div><span>งวดถัดไป</span><b>${st === "completed" ? "ครบสัญญา" : fmtDate(c.dueDate)}</b></div>
 
       </div>
 
@@ -768,14 +765,13 @@ function openDetail(id){
         </button>
 
         <button
-          class="btn primary"
-          data-action="pay"
-          data-id="${c.id}"
-          type="button"
-          ${st==="completed"?"disabled":""}
-        >
-          บันทึกชำระ 1 งวด
-        </button>
+  class="btn primary"
+  data-action="pay"
+  data-id="${c.id}"
+  ${st==="completed"?"disabled":""}
+>
+  ${st==="completed" ? "ชำระครบแล้ว" : "บันทึกชำระ 1 งวด"}
+</button>
 
       </div>
 
