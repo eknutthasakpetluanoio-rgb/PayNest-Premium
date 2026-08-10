@@ -223,3 +223,272 @@ window.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closeCus
 
 renderAll();
 if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+/* =========================================================
+   PayNest Payment History
+========================================================= */
+
+function pay(id){
+  const c=contracts.find(x=>x.id===id);
+  if(!c||c.paid>=c.term)return;
+
+  if(!Array.isArray(c.paymentHistory)){
+    c.paymentHistory=[];
+  }
+
+  const installmentNumber=Number(c.paid||0)+1;
+  const amount=Number(c.installment||0);
+  const paymentDate=todayISO();
+
+  c.paid++;
+
+  const remainingAfter=Math.max(
+    0,
+    amount*(Number(c.term||0)-Number(c.paid||0))
+  );
+
+  c.paymentHistory.unshift({
+    id:uid(),
+    installment:installmentNumber,
+    amount:amount,
+    date:paymentDate,
+    remaining:remainingAfter
+  });
+
+  if(c.paid<c.term){
+    c.dueDate=nextDueAfterPayment(c);
+  }
+
+  save();
+
+  toast(
+    c.paid>=c.term
+      ?"ชำระครบแล้ว"
+      :"บันทึกการชำระแล้ว"
+  );
+
+  openDetail(id);
+}
+
+
+/* ---------- Payment History UI ---------- */
+
+function paymentHistoryHTML(c){
+
+  const history=Array.isArray(c.paymentHistory)
+    ?c.paymentHistory
+    :[];
+
+  if(!history.length){
+    return `
+      <section class="detail-card glass">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">PAYMENT HISTORY</span>
+            <h2>ประวัติการชำระ</h2>
+          </div>
+        </div>
+
+        <div class="empty">
+          <b>ยังไม่มีประวัติการชำระ</b>
+          <span>เมื่อบันทึกการชำระ รายการจะปรากฏที่นี่</span>
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="detail-card glass">
+
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">PAYMENT HISTORY</span>
+          <h2>ประวัติการชำระ</h2>
+        </div>
+
+        <span class="status-badge success">
+          ${history.length} รายการ
+        </span>
+      </div>
+
+      <div class="list">
+
+        ${history.map((p,index)=>`
+
+          <div class="agenda-item">
+
+            <div>
+
+              <b>
+                งวดที่ ${p.installment}/${c.term}
+              </b>
+
+              <small>
+                ชำระวันที่ ${fmtDate(p.date)}
+              </small>
+
+              <small>
+                คงเหลือหลังชำระ ${money(p.remaining)}
+              </small>
+
+            </div>
+
+            <strong>
+              ${money(p.amount)}
+            </strong>
+
+          </div>
+
+        `).join("")}
+
+      </div>
+
+    </section>
+  `;
+}
+
+
+/* ---------- Detail Page Override ---------- */
+
+function openDetail(id){
+
+  currentId=id;
+
+  const c=contracts.find(x=>x.id===id);
+
+  if(!c)return;
+
+  const st=status(c);
+
+  const pct=c.term
+    ?Math.min(
+      100,
+      Math.round(c.paid/c.term*100)
+    )
+    :0;
+
+  $("#detailContent").innerHTML=`
+
+    <section class="detail-card glass">
+
+      <span class="eyebrow">
+        ${statusText(st).toUpperCase()}
+      </span>
+
+      <h2>${esc(c.product)}</h2>
+
+      <p>
+        ${esc(c.customer)}
+        ${c.phone?" • "+esc(c.phone):""}
+      </p>
+
+      <div class="detail-amount">
+        ${money(balance(c))}
+      </div>
+
+      <p>ยอดคงเหลือ</p>
+
+      <div
+        class="progress-wrap"
+        style="margin-top:20px"
+      >
+
+        <div class="progress-meta">
+
+          <span>
+            ชำระแล้ว ${c.paid}/${c.term} งวด
+          </span>
+
+          <b>${pct}%</b>
+
+        </div>
+
+        <div class="progress">
+          <i style="width:${pct}%"></i>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <section class="detail-card glass">
+
+      <div class="detail-grid">
+
+        <div>
+          <span>ราคาสินค้า</span>
+          <b>${money(c.price)}</b>
+        </div>
+
+        <div>
+          <span>เงินดาวน์</span>
+          <b>${money(c.down)}</b>
+        </div>
+
+        <div>
+          <span>ค่างวด</span>
+          <b>${money(c.installment)}</b>
+        </div>
+
+        <div>
+          <span>ประเภท</span>
+          <b>${frequencyText(c.frequency)}</b>
+        </div>
+
+        <div>
+          <span>เริ่มผ่อน</span>
+          <b>${fmtDate(c.startDate)}</b>
+        </div>
+
+        <div>
+          <span>งวดถัดไป</span>
+          <b>${fmtDate(c.dueDate)}</b>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <section class="detail-card glass">
+
+      <div class="section-head">
+        <h2>การชำระ</h2>
+      </div>
+
+      <div class="modal-actions">
+
+        <button
+          class="btn secondary"
+          data-action="delete"
+          data-id="${c.id}">
+          ลบสัญญา
+        </button>
+
+        <button
+          class="btn primary"
+          data-action="pay"
+          data-id="${c.id}"
+          ${st==="completed"?"disabled":""}>
+          บันทึกชำระ 1 งวด
+        </button>
+
+      </div>
+
+      ${
+        c.notes
+          ?`<p style="margin-top:15px">
+              ${esc(c.notes)}
+            </p>`
+          :""
+      }
+
+    </section>
+
+
+    ${paymentHistoryHTML(c)}
+
+  `;
+
+  go("detail");
+}
