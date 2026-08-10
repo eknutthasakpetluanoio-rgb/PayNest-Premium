@@ -201,3 +201,4 @@ window.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 renderAll();
 
 if ("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+
