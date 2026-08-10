@@ -191,7 +191,15 @@ document.addEventListener("click",e=>{
   const lf=e.target.closest("[data-list-filter]");if(lf){listFilter=lf.dataset.listFilter;renderContracts();return}
   const act=e.target.closest("[data-action]");if(!act)return;
   const a=act.dataset.action;
-  if(a==="add"){currentPage==="customers"?openCustomerModal():openModal();return}
+  if(a==="add"){
+  const activePage=document.querySelector(".nav.active")?.dataset.page||currentPage;
+  if(activePage==="customers"){
+    openCustomerModal();
+  }else{
+    openModal();
+  }
+  return;
+}
   if(a==="edit"&&currentId){openModal(currentId);return}
   if(a==="back"){go("contracts");return}
   if(a==="close-modal"){closeModal();return}
