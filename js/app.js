@@ -1244,11 +1244,14 @@ function formSubmit(e) {
   }
 
 
-  save();
+ save();
+closeModal();
 
-  closeModal();
-
-  renderAll();
+if (id) {
+    openDetail(id);
+} else {
+    renderAll();
+}
 }
 /* =========================================================
    PAYMENT
