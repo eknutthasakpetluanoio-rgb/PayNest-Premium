@@ -3002,15 +3002,19 @@ function renderAll() {
 ========================================================= */
 
 document.addEventListener(
-  "DOMContentLoaded",
-  () => {
+    "DOMContentLoaded",
+    () => {
 
-    bindEvents();
+        bindEvents();
 
-    renderAll();
+        // ซิงก์ลูกค้าจากสัญญาที่มีอยู่
+        contracts.forEach(contract => {
+            syncCustomer(contract);
+        });
 
-    go("home");
+        renderAll();
 
+        go("home");
   }
 );
 document.addEventListener("click", e => {
