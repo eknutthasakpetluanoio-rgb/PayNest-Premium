@@ -169,48 +169,7 @@
     </form>
   </div>
 </div>
-<script>
-(async function(){
-  try{
-    if("serviceWorker" in navigator){
-      const rs=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(rs.map(r=>r.unregister()));
-    }
-    if("caches" in window){
-      const ks=await caches.keys();
-      await Promise.all(ks.map(k=>caches.delete(k)));
-    }
-  }catch(e){}
-  const s=document.createElement("script");
-  s.src="js/app.js?v=20260811-04";
-  document.body.appendChild(s);
-})();
-</script>
 
-<script>
-(function(){
-  function openAdd(){
-    var m=document.getElementById("modal");
-    if(!m)return;
-    m.classList.remove("hidden");
-    m.style.display="grid";
-    var title=document.getElementById("modalTitle");
-    if(title)title.textContent="เพิ่มสัญญา";
-    var id=document.getElementById("editId");
-    if(id)id.value="";
-    var d=new Date(), iso=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    var down=document.getElementById("down"), freq=document.getElementById("frequency"), start=document.getElementById("startDate"), due=document.getElementById("dueDate");
-    if(down)down.value=0; if(freq)freq.value="monthly"; if(start)start.value=iso; if(due)due.value=iso;
-    var c=document.getElementById("customer"); if(c)setTimeout(function(){c.focus()},50);
-  }
-  function closeAdd(){var m=document.getElementById("modal");if(m)m.classList.add("hidden");}
-  var fab=document.getElementById("fab");
-  if(fab)fab.onclick=function(e){e.preventDefault();e.stopPropagation();openAdd();};
-  var close=document.querySelectorAll('[data-action="close-modal"]');
-  close.forEach(function(x){x.onclick=function(e){e.preventDefault();closeAdd();};});
-})();
-
-<script src="js/app.js?v=20260811-03"></script>
-
+<script src="js/app.js?v=20260811-05"></script>
 </body>
 </html>
