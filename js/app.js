@@ -1533,25 +1533,7 @@ function deleteContract(id) {
         x => x.id !== id
     );
 
-// ลบลูกค้าเมื่อไม่มีสัญญาเหลือ
-const customerIndex =
-    customers.findIndex(
-        x =>
-            String(x.name || "").trim().toLowerCase() ===
-            String(c.customer || "").trim().toLowerCase()
-    );
 
-const hasContract =
-    contracts.some(
-        x =>
-            String(x.customer || "").trim().toLowerCase() ===
-            String(c.customer || "").trim().toLowerCase()
-    );
-
-if (customerIndex !== -1 && !hasContract) {
-    customers.splice(customerIndex, 1);
-    saveCustomers();
-}
 
 save();
 
