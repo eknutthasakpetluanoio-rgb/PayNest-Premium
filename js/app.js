@@ -1,8 +1,9 @@
 const KEY = "paynest_contracts_v1";
 const CUSTOMER_KEY = "paynest_customers_v1";
+const BACKUP_KEY = "paynest_last_good_backup_v1";
 
-let contracts = load();
-let customers = loadCustomers();
+let contracts = load().map(normalizeContract).filter(Boolean);
+let customers = loadCustomers().map(normalizeCustomer).filter(c => c && c.name);
 
 let currentPage = "home";
 let currentId = null;
@@ -53,8 +54,34 @@ function load() {
   }
 }
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(contracts));
+function save(options = {}) {
+  const allowEmpty = options.allowEmpty === true;
+
+  try {
+    const previous = localStorage.getItem(KEY);
+
+    if (!allowEmpty && contracts.length === 0 && previous) {
+      const parsed = JSON.parse(previous);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        localStorage.setItem(BACKUP_KEY, previous);
+        return false;
+      }
+    }
+
+    if (previous) {
+      try {
+        const parsed = JSON.parse(previous);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          localStorage.setItem(BACKUP_KEY, previous);
+        }
+      } catch {}
+    }
+
+    localStorage.setItem(KEY, JSON.stringify(contracts));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function loadCustomers() {
@@ -67,13 +94,96 @@ function loadCustomers() {
 }
 
 function saveCustomers() {
-  localStorage.setItem(CUSTOMER_KEY, JSON.stringify(customers));
+  try {
+    localStorage.setItem(
+      CUSTOMER_KEY,
+      JSON.stringify(customers)
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function uid() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
+
+function normalizeContract(c) {
+  if (!c || typeof c !== "object") return null;
+
+  return {
+    ...c,
+    id: String(c.id || uid()),
+    customer: String(c.customer || "").trim(),
+    phone: String(c.phone || "").trim(),
+    product: String(c.product || "").trim(),
+    price: Number(c.price || 0),
+    down: Number(c.down || 0),
+    frequency: ["daily", "weekly", "monthly"].includes(c.frequency)
+      ? c.frequency
+      : "monthly",
+    installment: Number(c.installment || 0),
+    term: Math.max(0, Number(c.term || 0)),
+    paid: Math.max(0, Number(c.paid || 0)),
+    paymentHistory: Array.isArray(c.paymentHistory) ? c.paymentHistory : [],
+    startDate: c.startDate || "",
+    dueDate: c.dueDate || "",
+    notes: String(c.notes || ""),
+    createdAt: c.createdAt || new Date().toISOString()
+  };
+}
+
+function normalizeCustomer(c) {
+  if (!c || typeof c !== "object") return null;
+
+  return {
+    ...c,
+    id: String(c.id || uid()),
+    name: String(c.name || "").trim(),
+    phone: String(c.phone || "").trim(),
+    notes: String(c.notes || ""),
+    createdAt: c.createdAt || new Date().toISOString(),
+    updatedAt: c.updatedAt || new Date().toISOString()
+  };
+}
+
+function ensureCustomerRecords() {
+  const map = new Map();
+
+  customers
+    .map(normalizeCustomer)
+    .filter(c => c && c.name)
+    .forEach(c => {
+      const key = c.name.toLowerCase();
+      if (!map.has(key)) map.set(key, c);
+    });
+
+  contracts
+    .map(normalizeContract)
+    .filter(c => c && c.customer)
+    .forEach(c => {
+      const key = c.customer.toLowerCase();
+
+      if (!map.has(key)) {
+        map.set(key, {
+          id: uid(),
+          name: c.customer,
+          phone: c.phone || "",
+          notes: "",
+          createdAt: c.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      } else if (!map.get(key).phone && c.phone) {
+        map.get(key).phone = c.phone;
+      }
+    });
+
+  customers = [...map.values()];
+}
+
+
 
 /* =========================================================
    CUSTOMER
@@ -903,217 +1013,4 @@ function openCustomerDetail(name) {
                     </div>
 
                     <strong>
-                      ${money(balance(c))}
-                    </strong>
-
-                  </button>
-
-                `).join("")
-              }
-
-            </div>
-          `
-
-          : emptyHTML(
-              "ยังไม่มีสัญญา",
-              "ลูกค้ารายนี้ยังไม่มีสัญญา"
-            )
-      }
-
-    </section>
-
-  `;
-
-  go("detail");
-}
-
-
-/* =========================================================
-   CONTRACT MODAL
-========================================================= */
-
-function openModal(id = null) {
-
-  const form =
-    $("#contractForm");
-
-  if (
-    !form ||
-    !$("#modal")
-  ) {
-    return;
-  }
-
-  form.reset();
-
-  if ($("#editId")) {
-    $("#editId").value = "";
-  }
-
-  $("#modalTitle").textContent =
-    id
-      ? "แก้ไขสัญญา"
-      : "เพิ่มสัญญา";
-
-
-  if (id) {
-
-    const c =
-      contracts.find(
-        x => x.id === id
-      );
-
-    if (!c) return;
-
-    if ($("#editId")) {
-      $("#editId").value =
-        c.id;
-    }
-
-    [
-      "customer",
-      "phone",
-      "product",
-      "price",
-      "down",
-      "frequency",
-      "installment",
-      "term",
-      "startDate",
-      "dueDate",
-      "notes"
-    ].forEach(k => {
-
-      if ($(`#${k}`)) {
-
-        $(`#${k}`).value =
-          c[k] ?? "";
-
-      }
-
-    });
-
-  } else {
-
-    if ($("#down"))
-      $("#down").value = 0;
-
-    if ($("#frequency"))
-      $("#frequency").value =
-        "monthly";
-
-    if ($("#startDate"))
-      $("#startDate").value =
-        todayISO();
-
-    if ($("#dueDate"))
-      $("#dueDate").value =
-        todayISO();
-
-  }
-
-
-  updateCalc();
-
-  $("#modal")
-    .classList
-    .remove("hidden");
-
-  setTimeout(
-    () => $("#customer")?.focus(),
-    50
-  );
-}
-
-
-function closeModal() {
-
-  if ($("#modal")) {
-
-    $("#modal")
-      .classList
-      .add("hidden");
-
-  }
-}
-
-
-function updateCalc() {
-
-  const price =
-    Number(
-      $("#price")?.value
-    ) || 0;
-
-  const down =
-    Number(
-      $("#down")?.value
-    ) || 0;
-
-  const inst =
-    Number(
-      $("#installment")?.value
-    ) || 0;
-
-  const term =
-    Number(
-      $("#term")?.value
-    ) || 0;
-
-
-  if ($("#financeAmount")) {
-
-    $("#financeAmount")
-      .textContent =
-      money(
-        Math.max(
-          0,
-          price - down
-        )
-      );
-
-  }
-
-
-  if ($("#financeTotal")) {
-
-    $("#financeTotal")
-      .textContent =
-      money(
-        inst * term
-      );
-
-  }
-
-}
-
-
-/* =========================================================
-   SAVE CONTRACT
-========================================================= */
-
-function formSubmit(e) {
-
-  e.preventDefault();
-
-  const id =
-    $("#editId")?.value;
-
-
-  const data = {
-
-    customer:
-      $("#customer")?.value.trim() ||
-      "",
-
-    phone:
-      $("#phone")?.value.trim() ||
-      "",
-
-    product:
-      $("#product")?.value.trim() ||
-      "",
-
-    price:
-      Number(
-        $("#pr
+         
