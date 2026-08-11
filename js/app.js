@@ -2615,13 +2615,21 @@ function bindEvents() {
         }
 
 
-        if (type === "delete") {
+        if (type === "edit") {
 
-          deleteContract(id);
+    openContractModal(id);
 
-          return;
+    return;
 
-        }
+}
+
+if (type === "delete") {
+
+    deleteContract(id);
+
+    return;
+
+}
 
 
         if (
