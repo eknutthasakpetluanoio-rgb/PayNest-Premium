@@ -95,10 +95,7 @@ function loadCustomers() {
 
 function saveCustomers() {
   try {
-    localStorage.setItem(
-      CUSTOMER_KEY,
-      JSON.stringify(customers)
-    );
+    localStorage.setItem(CUSTOMER_KEY, JSON.stringify(customers));
     return true;
   } catch {
     return false;
@@ -127,7 +124,9 @@ function normalizeContract(c) {
     installment: Number(c.installment || 0),
     term: Math.max(0, Number(c.term || 0)),
     paid: Math.max(0, Number(c.paid || 0)),
-    paymentHistory: Array.isArray(c.paymentHistory) ? c.paymentHistory : [],
+    paymentHistory: Array.isArray(c.paymentHistory)
+      ? c.paymentHistory
+      : [],
     startDate: c.startDate || "",
     dueDate: c.dueDate || "",
     notes: String(c.notes || ""),
@@ -183,8 +182,6 @@ function ensureCustomerRecords() {
   customers = [...map.values()];
 }
 
-
-
 /* =========================================================
    CUSTOMER
 ========================================================= */
@@ -234,7 +231,6 @@ function addPeriod(s, f) {
     const targetMonth = d.getMonth() + 1;
     d.setDate(1);
     d.setMonth(targetMonth);
-
     d.setDate(Math.min(
       day,
       new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
@@ -256,25 +252,18 @@ function nextDueAfterPayment(c) {
 ========================================================= */
 
 function status(c) {
-  if (Number(c.paid || 0) >= Number(c.term || 0)) {
-    return "completed";
-  }
+  const paid = Number(c.paid || 0);
+  const term = Number(c.term || 0);
 
-  if (c.dueDate && c.dueDate < todayISO()) {
-    return "overdue";
-  }
+  if (term > 0 && paid >= term) return "completed";
 
-  const left =
-    Number(c.term || 0) -
-    Number(c.paid || 0);
+  if (c.dueDate && c.dueDate < todayISO()) return "overdue";
+
+  const left = Math.max(0, term - paid);
 
   if (
     left <= 2 ||
-    (
-      Number(c.term || 0) > 0 &&
-      Number(c.paid || 0) /
-      Number(c.term || 0) >= 0.8
-    )
+    (term > 0 && paid / term >= 0.8)
   ) {
     return "near";
   }
@@ -288,31 +277,25 @@ function balance(c) {
     Number(c.installment || 0) *
     Math.max(
       0,
-      Number(c.term || 0) -
-      Number(c.paid || 0)
+      Number(c.term || 0) - Number(c.paid || 0)
     )
   );
 }
 
 function totalContractValue(c) {
-  return Number(c.installment || 0) *
-    Number(c.term || 0);
+  return Number(c.installment || 0) * Number(c.term || 0);
 }
 
 function fmtDate(s) {
   if (!s) return "ไม่ระบุ";
-
   const d = parseDate(s);
 
   return d
-    ? d.toLocaleDateString(
-        "th-TH",
-        {
-          day: "numeric",
-          month: "short",
-          year: "numeric"
-        }
-      )
+    ? d.toLocaleDateString("th-TH", {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      })
     : "ไม่ระบุ";
 }
 
@@ -341,25 +324,15 @@ function go(page) {
   currentPage = page;
 
   $$(".page").forEach(p => {
-    p.classList.toggle(
-      "active",
-      p.id === `page-${page}`
-    );
+    p.classList.toggle("active", p.id === `page-${page}`);
   });
 
   $$(".nav").forEach(n => {
-    n.classList.toggle(
-      "active",
-      n.dataset.page === page
-    );
+    n.classList.toggle("active", n.dataset.page === page);
   });
 
-  if ($("#fab")) {
-    $("#fab").style.display =
-      page === "detail"
-        ? "none"
-        : "grid";
-  }
+  const fab = $("#fab");
+  if (fab) fab.style.display = page === "detail" ? "none" : "grid";
 
   if (page === "home") renderHome();
   if (page === "contracts") renderContracts();
@@ -367,10 +340,7 @@ function go(page) {
   if (page === "customers") renderCustomers();
   if (page === "settings") renderSettings();
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* =========================================================
@@ -378,100 +348,60 @@ function go(page) {
 ========================================================= */
 
 function renderHome() {
-  const active =
-    contracts.filter(
-      c => status(c) !== "completed"
-    );
+  const active = contracts.filter(c => status(c) !== "completed");
 
-  const monthly =
-    active
-      .filter(
-        c => c.frequency === "monthly"
-      )
-      .reduce(
-        (s, c) =>
-          s + Number(c.installment || 0),
-        0
-      );
+  const monthly = active
+    .filter(c => c.frequency === "monthly")
+    .reduce((s, c) => s + Number(c.installment || 0), 0);
 
-  const remain =
-    contracts.reduce(
-      (s, c) => s + balance(c),
-      0
-    );
+  const remain = contracts.reduce((s, c) => s + balance(c), 0);
 
-  const paid =
-    contracts.reduce(
-      (s, c) =>
-        s +
-        Number(c.installment || 0) *
-        Number(c.paid || 0),
-      0
-    );
+  const paid = contracts.reduce(
+    (s, c) =>
+      s +
+      Number(c.installment || 0) *
+      Number(c.paid || 0),
+    0
+  );
 
-  const total =
-    contracts.reduce(
-      (s, c) =>
-        s + totalContractValue(c),
-      0
-    );
+  const total = contracts.reduce(
+    (s, c) => s + totalContractValue(c),
+    0
+  );
 
-  const progress =
-    total
-      ? Math.min(
-          100,
-          Math.round(
-            paid / total * 100
-          )
-        )
-      : 0;
+  const progress = total
+    ? Math.min(100, Math.round((paid / total) * 100))
+    : 0;
 
-  if ($("#monthlyTotal"))
-    $("#monthlyTotal").textContent =
-      money(monthly);
+  if ($("#monthlyTotal")) $("#monthlyTotal").textContent = money(monthly);
+  if ($("#totalContractsText")) {
+    $("#totalContractsText").textContent = `${contracts.length} สัญญา`;
+  }
+  if ($("#remainingTotal")) $("#remainingTotal").textContent = money(remain);
+  if ($("#paidTotal")) $("#paidTotal").textContent = money(paid);
+  if ($("#overallProgressText")) {
+    $("#overallProgressText").textContent = `${progress}%`;
+  }
+  if ($("#overallProgress")) {
+    $("#overallProgress").style.width = `${progress}%`;
+  }
 
-  if ($("#totalContractsText"))
-    $("#totalContractsText").textContent =
-      `${contracts.length} สัญญา`;
-
-  if ($("#remainingTotal"))
-    $("#remainingTotal").textContent =
-      money(remain);
-
-  if ($("#paidTotal"))
-    $("#paidTotal").textContent =
-      money(paid);
-
-  if ($("#overallProgressText"))
-    $("#overallProgressText").textContent =
-      `${progress}%`;
-
-  if ($("#overallProgress"))
-    $("#overallProgress").style.width =
-      `${progress}%`;
-
-  if ($("#normalCount"))
+  if ($("#normalCount")) {
     $("#normalCount").textContent =
-      contracts.filter(
-        c => status(c) === "normal"
-      ).length;
+      contracts.filter(c => status(c) === "normal").length;
+  }
 
-  if ($("#nearCount"))
+  if ($("#nearCount")) {
     $("#nearCount").textContent =
-      contracts.filter(
-        c => status(c) === "near"
-      ).length;
+      contracts.filter(c => status(c) === "near").length;
+  }
 
-  if ($("#overdueCount"))
+  if ($("#overdueCount")) {
     $("#overdueCount").textContent =
-      contracts.filter(
-        c => status(c) === "overdue"
-      ).length;
+      contracts.filter(c => status(c) === "overdue").length;
+  }
 
-  const overdue =
-    contracts.filter(
-      c => status(c) === "overdue"
-    ).length;
+  const overdue = contracts.filter(c => status(c) === "overdue").length;
 
   if ($("#insight")) {
     $("#insight").textContent =
@@ -482,25 +412,16 @@ function renderHome() {
           : `มี ${active.length} สัญญาที่ยังดำเนินอยู่ ความคืบหน้ารวม ${progress}%`;
   }
 
-  const recent =
-    [...contracts]
-      .sort(
-        (a, b) =>
-          (b.createdAt || "")
-            .localeCompare(
-              a.createdAt || ""
-            )
-      )
-      .slice(0, 4);
+  const recent = [...contracts]
+    .sort((a, b) =>
+      (b.createdAt || "").localeCompare(a.createdAt || "")
+    )
+    .slice(0, 4);
 
   if ($("#recentList")) {
-    $("#recentList").innerHTML =
-      recent.length
-        ? recent.map(cardHTML).join("")
-        : emptyHTML(
-            "ยังไม่มีสัญญา",
-            "กด + เพื่อเพิ่มสัญญา"
-          );
+    $("#recentList").innerHTML = recent.length
+      ? recent.map(cardHTML).join("")
+      : emptyHTML("ยังไม่มีสัญญา", "กด + เพื่อเพิ่มสัญญา");
   }
 }
 
@@ -511,66 +432,35 @@ function renderHome() {
 function cardHTML(c) {
   const st = status(c);
 
-  const pct =
-    c.term
-      ? Math.min(
-          100,
-          Math.round(
-            Number(c.paid || 0) /
-            Number(c.term || 0) *
-            100
-          )
+  const pct = c.term
+    ? Math.min(
+        100,
+        Math.round(
+          (Number(c.paid || 0) / Number(c.term || 0)) * 100
         )
-      : 0;
+      )
+    : 0;
 
   return `
-    <button
-      class="contract-card"
-      data-open="${esc(c.id)}"
-      type="button"
-    >
-
+    <button class="contract-card" data-open="${esc(c.id)}" type="button">
       <div class="card-row">
-
         <div>
-
-          <h3>
-            ${esc(c.product)}
-          </h3>
-
+          <h3>${esc(c.product || "ไม่ระบุสินค้า")}</h3>
           <p>
-            ${esc(c.customer)}
-            ${c.phone
-              ? " • " + esc(c.phone)
-              : ""}
+            ${esc(c.customer || "ไม่ระบุลูกค้า")}
+            ${c.phone ? " • " + esc(c.phone) : ""}
           </p>
-
         </div>
-
-        <div class="balance">
-          ${money(balance(c))}
-        </div>
-
+        <div class="balance">${money(balance(c))}</div>
       </div>
 
-      <div
-        class="progress-wrap"
-        style="margin-top:13px"
-      >
-
+      <div class="progress-wrap" style="margin-top:13px">
         <div class="progress">
-          <i
-            style="width:${pct}%"
-          ></i>
+          <i style="width:${pct}%"></i>
         </div>
-
       </div>
 
-      <div
-        class="card-row"
-        style="margin-top:8px"
-      >
-
+      <div class="card-row" style="margin-top:8px">
         <p>
           ${frequencyText(c.frequency)}
           •
@@ -578,22 +468,18 @@ function cardHTML(c) {
           งวด
         </p>
 
-        <span
-          class="status-badge ${
-            st === "overdue"
-              ? "danger"
-              : st === "near"
-                ? "warning"
-                : st === "completed"
-                  ? "success"
-                  : ""
-          }"
-        >
+        <span class="status-badge ${
+          st === "overdue"
+            ? "danger"
+            : st === "near"
+              ? "warning"
+              : st === "completed"
+                ? "success"
+                : ""
+        }">
           ${statusText(st)}
         </span>
-
       </div>
-
     </button>
   `;
 }
@@ -612,57 +498,37 @@ function emptyHTML(a, b) {
 ========================================================= */
 
 function renderContracts() {
-  const q =
-    ($("#searchInput")?.value || "")
-      .trim()
-      .toLowerCase();
+  const q = ($("#searchInput")?.value || "").trim().toLowerCase();
+  const sort = $("#sortSelect")?.value || "due";
 
-  const sort =
-    $("#sortSelect")?.value ||
-    "due";
-
-  let arr =
-    contracts.filter(c =>
-      (
-        !q ||
-        `${c.customer} ${c.product} ${c.phone || ""}`
-          .toLowerCase()
-          .includes(q)
-      ) &&
-      (
-        listFilter === "all" ||
-        status(c) === listFilter
-      )
-    );
+  let arr = contracts.filter(c =>
+    (
+      !q ||
+      `${c.customer} ${c.product} ${c.phone || ""}`
+        .toLowerCase()
+        .includes(q)
+    ) &&
+    (
+      listFilter === "all" ||
+      status(c) === listFilter
+    )
+  );
 
   arr.sort((a, b) => {
-
     if (sort === "newest") {
-      return (
-        b.createdAt || ""
-      ).localeCompare(
-        a.createdAt || ""
-      );
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
     }
 
-    if (sort === "balance") {
-      return balance(b) - balance(a);
-    }
+    if (sort === "balance") return balance(b) - balance(a);
 
     if (sort === "name") {
-      return String(
-        a.customer || ""
-      ).localeCompare(
+      return String(a.customer || "").localeCompare(
         String(b.customer || ""),
         "th"
       );
     }
 
-    return (
-      a.dueDate || "9999"
-    ).localeCompare(
-      b.dueDate || "9999"
-    );
+    return (a.dueDate || "9999").localeCompare(b.dueDate || "9999");
   });
 
   if ($("#contractCountLabel")) {
@@ -671,22 +537,16 @@ function renderContracts() {
   }
 
   if ($("#contractList")) {
-    $("#contractList").innerHTML =
-      arr.length
-        ? arr.map(cardHTML).join("")
-        : emptyHTML(
-            "ไม่พบสัญญา",
-            "ลองเปลี่ยนคำค้นหาหรือตัวกรอง"
-          );
+    $("#contractList").innerHTML = arr.length
+      ? arr.map(cardHTML).join("")
+      : emptyHTML("ไม่พบสัญญา", "ลองเปลี่ยนคำค้นหาหรือตัวกรอง");
   }
 
   $$(".chip").forEach(x => {
-    x.classList.toggle(
-      "active",
-      x.dataset.listFilter === listFilter
-    );
+    x.classList.toggle("active", x.dataset.listFilter === listFilter);
   });
 }
+
 /* =========================================================
    CONTRACT DETAIL
 ========================================================= */
@@ -695,10 +555,7 @@ function openDetail(id) {
   currentId = id;
   currentDetailType = "contract";
 
-  const c = contracts.find(
-    x => x.id === id
-  );
-
+  const c = contracts.find(x => x.id === id);
   if (!c || !$("#detailContent")) return;
 
   const st = status(c);
@@ -707,128 +564,58 @@ function openDetail(id) {
     ? Math.min(
         100,
         Math.round(
-          Number(c.paid || 0) /
-          Number(c.term || 0) *
-          100
+          (Number(c.paid || 0) / Number(c.term || 0)) * 100
         )
       )
     : 0;
 
   $("#detailContent").innerHTML = `
-
     <section class="detail-card glass">
-
-      <span class="eyebrow">
-        ${esc(statusText(st).toUpperCase())}
-      </span>
-
-      <h2>
-        ${esc(c.product)}
-      </h2>
-
+      <span class="eyebrow">${esc(statusText(st).toUpperCase())}</span>
+      <h2>${esc(c.product)}</h2>
       <p>
         ${esc(c.customer)}
-        ${c.phone
-          ? " • " + esc(c.phone)
-          : ""}
+        ${c.phone ? " • " + esc(c.phone) : ""}
       </p>
 
-      <div class="detail-amount">
-        ${money(balance(c))}
-      </div>
-
+      <div class="detail-amount">${money(balance(c))}</div>
       <p>ยอดคงเหลือ</p>
 
-      <div
-        class="progress-wrap"
-        style="margin-top:20px"
-      >
-
+      <div class="progress-wrap" style="margin-top:20px">
         <div class="progress-meta">
-
           <span>
             ชำระแล้ว
             ${Number(c.paid || 0)}/${Number(c.term || 0)}
             งวด
           </span>
-
           <b>${pct}%</b>
-
         </div>
-
         <div class="progress">
-
-          <i
-            style="width:${pct}%"
-          ></i>
-
+          <i style="width:${pct}%"></i>
         </div>
-
       </div>
-
     </section>
 
-
     <section class="detail-card glass">
-
       <div class="detail-grid">
-
+        <div><span>ราคาสินค้า</span><b>${money(c.price)}</b></div>
+        <div><span>เงินดาวน์</span><b>${money(c.down)}</b></div>
+        <div><span>ค่างวด</span><b>${money(c.installment)}</b></div>
+        <div><span>ประเภท</span><b>${frequencyText(c.frequency)}</b></div>
+        <div><span>เริ่มผ่อน</span><b>${fmtDate(c.startDate)}</b></div>
         <div>
-          <span>ราคาสินค้า</span>
-          <b>${money(c.price)}</b>
-        </div>
-
-        <div>
-          <span>เงินดาวน์</span>
-          <b>${money(c.down)}</b>
-        </div>
-
-        <div>
-          <span>ค่างวด</span>
-          <b>${money(c.installment)}</b>
-        </div>
-
-        <div>
-          <span>ประเภท</span>
-          <b>${frequencyText(c.frequency)}</b>
-        </div>
-
-        <div>
-          <span>เริ่มผ่อน</span>
-          <b>${fmtDate(c.startDate)}</b>
-        </div>
-
-        <div>
-
           <span>งวดถัดไป</span>
-
-          <b>
-            ${
-              st === "completed"
-                ? "ครบสัญญา"
-                : fmtDate(c.dueDate)
-            }
-          </b>
-
+          <b>${st === "completed" ? "ครบสัญญา" : fmtDate(c.dueDate)}</b>
         </div>
-
       </div>
-
     </section>
 
-
     <section class="detail-card glass">
-
       <div class="section-head">
-
-        <h2>
-          การชำระ
-        </h2>
-
+        <h2>การชำระ</h2>
       </div>
 
       <div class="modal-actions">
-
         <button
           class="btn secondary"
           data-action="delete"
@@ -838,7 +625,6 @@ function openDetail(id) {
           ลบสัญญา
         </button>
 
-
         <button
           class="btn primary"
           data-action="pay"
@@ -846,171 +632,177 @@ function openDetail(id) {
           ${st === "completed" ? "disabled" : ""}
           type="button"
         >
-          ${
-            st === "completed"
-              ? "ชำระครบแล้ว"
-              : "บันทึกชำระ 1 งวด"
-          }
+          ${st === "completed" ? "ชำระครบแล้ว" : "บันทึกชำระ 1 งวด"}
         </button>
-
       </div>
-
 
       ${
         c.notes
-          ? `<p style="margin-top:15px">
-              ${esc(c.notes)}
-            </p>`
+          ? `<p style="margin-top:15px">${esc(c.notes)}</p>`
           : ""
       }
-
     </section>
 
-
     ${paymentHistoryHTML(c)}
-
   `;
 
   go("detail");
 }
-
 
 /* =========================================================
    CUSTOMER DETAIL
 ========================================================= */
 
 function openCustomerDetail(name) {
-
-  const customer =
-    customers.find(c =>
-      String(c.name || "")
-        .toLowerCase() ===
-      String(name || "")
-        .toLowerCase()
-    );
+  const customer = customers.find(c =>
+    String(c.name || "").toLowerCase() ===
+    String(name || "").toLowerCase()
+  );
 
   if (!customer) return;
 
-  currentCustomerName =
-    customer.name;
-
-  currentDetailType =
-    "customer";
-
+  currentCustomerName = customer.name;
+  currentDetailType = "customer";
   currentId = null;
 
-  const related =
-    contracts
-      .filter(c =>
-        String(c.customer || "")
-          .toLowerCase() ===
-        customer.name.toLowerCase()
-      )
-      .sort((a, b) =>
-        (a.dueDate || "9999")
-          .localeCompare(
-            b.dueDate || "9999"
-          )
-      );
-
-  const total =
-    related.reduce(
-      (s, c) =>
-        s + balance(c),
-      0
+  const related = contracts
+    .filter(c =>
+      String(c.customer || "").toLowerCase() ===
+      customer.name.toLowerCase()
+    )
+    .sort((a, b) =>
+      (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
     );
 
+  const total = related.reduce((s, c) => s + balance(c), 0);
+
   $("#detailContent").innerHTML = `
-
     <section class="detail-card glass">
-
-      <span class="eyebrow">
-        CUSTOMER
-      </span>
-
-      <h2>
-        ${esc(customer.name)}
-      </h2>
-
-      ${
-        customer.phone
-          ? `<p>
-              ${esc(customer.phone)}
-            </p>`
-          : ""
-      }
-
-      <div class="detail-amount">
-        ${money(total)}
-      </div>
-
-      <p>
-        ยอดคงเหลือทั้งหมด
-      </p>
-
+      <span class="eyebrow">CUSTOMER</span>
+      <h2>${esc(customer.name)}</h2>
+      ${customer.phone ? `<p>${esc(customer.phone)}</p>` : ""}
+      <div class="detail-amount">${money(total)}</div>
+      <p>ยอดคงเหลือทั้งหมด</p>
     </section>
 
-
     <section class="detail-card glass">
-
       <div class="section-head">
-
         <div>
-
-          <span class="eyebrow">
-            CONTRACTS
-          </span>
-
-          <h2>
-            สัญญาของลูกค้า
-          </h2>
-
+          <span class="eyebrow">CONTRACTS</span>
+          <h2>สัญญาของลูกค้า</h2>
         </div>
-
-        <span class="status-badge">
-          ${related.length} สัญญา
-        </span>
-
+        <span class="status-badge">${related.length} สัญญา</span>
       </div>
-
 
       ${
         related.length
+          ? `<div class="list">
+              ${related.map(c => `
+                <button class="agenda-item" data-open="${esc(c.id)}" type="button">
+                  <div>
+                    <b>${esc(c.product)}</b>
+                    <small>
+                      ${frequencyText(c.frequency)}
+                      •
+                      ${Number(c.paid || 0)}/${Number(c.term || 0)}
+                      งวด
+                    </small>
+                    <small>
+                      ${
+                        status(c) === "completed"
+                          ? "ครบสัญญา"
+                          : `งวดถัดไป ${fmtDate(c.dueDate)}`
+                      }
+                    </small>
+                  </div>
+                  <strong>${money(balance(c))}</strong>
+                </button>
+              `).join("")}
+            </div>`
+          : emptyHTML("ยังไม่มีสัญญา", "ลูกค้ารายนี้ยังไม่มีสัญญา")
+      }
+    </section>
+  `;
 
-          ? `
-            <div class="list">
+  go("detail");
+}
 
-              ${
-                related.map(c => `
+/* =========================================================
+   CONTRACT MODAL
+========================================================= */
 
-                  <button
-                    class="agenda-item"
-                    data-open="${esc(c.id)}"
-                    type="button"
-                  >
+function openModal(id = null) {
+  const form = $("#contractForm");
+  const modal = $("#modal");
 
-                    <div>
+  if (!form || !modal) {
+    toast("ไม่พบฟอร์มสัญญา");
+    return;
+  }
 
-                      <b>
-                        ${esc(c.product)}
-                      </b>
+  form.reset();
 
-                      <small>
-                        ${frequencyText(c.frequency)}
-                        •
-                        ${Number(c.paid || 0)}/${Number(c.term || 0)}
-                        งวด
-                      </small>
+  if ($("#editId")) $("#editId").value = "";
+  if ($("#modalTitle")) $("#modalTitle").textContent = id ? "แก้ไขสัญญา" : "เพิ่มสัญญา";
 
-                      <small>
-                        ${
-                          status(c) === "completed"
-                            ? "ครบสัญญา"
-                            : `งวดถัดไป ${fmtDate(c.dueDate)}`
-                        }
-                      </small>
+  if (id) {
+    const c = contracts.find(x => x.id === id);
+    if (!c) {
+      toast("ไม่พบสัญญา");
+      return;
+    }
 
-                    </div>
+    if ($("#editId")) $("#editId").value = c.id;
 
-                    <strong>
-         
+    [
+      "customer",
+      "phone",
+      "product",
+      "price",
+      "down",
+      "frequency",
+      "installment",
+      "term",
+      "startDate",
+      "dueDate",
+      "notes"
+    ].forEach(k => {
+      const el = $(`#${k}`);
+      if (el) el.value = c[k] ?? "";
+    });
+  } else {
+    if ($("#down")) $("#down").value = 0;
+    if ($("#frequency")) $("#frequency").value = "monthly";
+
+    const today = todayISO();
+    if ($("#startDate")) $("#startDate").value = today;
+    if ($("#dueDate")) $("#dueDate").value = today;
+  }
+
+  updateCalc();
+  modal.classList.remove("hidden");
+
+  setTimeout(() => $("#customer")?.focus(), 80);
+}
+
+function closeModal() {
+  $("#modal")?.classList.add("hidden");
+}
+
+function updateCalc() {
+  const price = Number($("#price")?.value) || 0;
+  const down = Number($("#down")?.value) || 0;
+  const inst = Number($("#installment")?.value) || 0;
+  const term = Number($("#term")?.value) || 0;
+
+  if ($("#financeAmount")) {
+    $("#financeAmount").textContent = money(Math.max(0, price - down));
+  }
+
+  if ($("#financeTotal")) {
+    $("#financeTotal").textContent = money(inst * term);
+  }
+}
+
+/* =========================================================
+  
