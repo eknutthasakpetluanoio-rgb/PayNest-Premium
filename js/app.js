@@ -1583,13 +1583,11 @@ function renderCustomers() {
       );
 
 
-  if ($("#customerCount")) {
-
-    $("#customerCount")
-      .textContent =
-      `${arr.length} ราย`;
-
-  }
+  if ($("#customerCountLabel")) {
+    $("#customerCountLabel")
+        .textContent =
+        `${arr.length} ราย`;
+}
 
   /*
    * รองรับทั้ง id ที่อาจมีอยู่
