@@ -1591,7 +1591,6 @@ function renderCustomers() {
 
   }
 
-
   /*
    * รองรับทั้ง id ที่อาจมีอยู่
    * ใน index.html คนละเวอร์ชัน
